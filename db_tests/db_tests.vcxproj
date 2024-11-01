@@ -132,6 +132,7 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClCompile Include="BloomFilter.h" />
     <ClCompile Include="BufferManager.cpp" />
     <ClCompile Include="FileName.cpp" />
     <ClCompile Include="lsm_tree.cpp" />

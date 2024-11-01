@@ -36,6 +36,9 @@
     <ClCompile Include="Table.cpp">
       <Filter>Header Files\lsm_tree_source</Filter>
     </ClCompile>
+    <ClCompile Include="BloomFilter.h">
+      <Filter>Header Files\lsm_tree</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="BTree.h">

@@ -13,11 +13,6 @@
 
 
 
-
-
-
-
-
 int main(int argc, char* argv[]) {
 	char name1[] = "c1";
 	char name2[] = "c2";
@@ -78,7 +73,5 @@ int main(int argc, char* argv[]) {
 	*a22 = 0;
 	void* argss[] = { a11, a22 };
 	//Conditions::equals(&table, (char*)"c1", argss, 2);
-
-
 
 }

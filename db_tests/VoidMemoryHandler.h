@@ -9,7 +9,6 @@ protected:
 		if (*(int*)argument1 < *(int*)argument2) return -1;
 		if (*(int*)argument1 == *(int*)argument2) return 0;
 		if (*(int*)argument1 > *(int*)argument2) return 1;
-
 	}
 public:
 	static void INT(void* memory) {

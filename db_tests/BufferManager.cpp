@@ -24,54 +24,7 @@ void BufferManager::StoreLevel1(Table* table) {
 		NULL
 	);
 
-	if(fileHandle == INVALID_HANDLE_VALUE)std::cerr << "CreateFileA failed, error: " << GetLastError() << std::endl;
-
-	//void* buffer = malloc(128 * table->rowSize + 16); // + 16 for freeMemory array
-	//if (!buffer) return;
-	//std::memcpy(buffer, table->freeMemory, 16);
-	//std::memcpy((char*)buffer + 16, table->values, table->rowSize * 128);
-
-	//std::cout << "checking buffer  ";
-	//for (int i = 0; i <= 127; i++)
-	//	std::cout << BitwiseHandler::checkBit((uint8_t*)buffer, i);
-	//std::cout << "" << std::endl;
-
-
-	//DWORD numberOfBytesWritten = 0;
-	//bool result = WriteFile(
-	//	fileHandle,
-	//	buffer,
-	//	table->rowSize * 128 + 16,
-	//	&numberOfBytesWritten,
-	//	NULL
-	//);
-
-	//if(!result)std::cerr << "WriteFile failed, error: " << GetLastError() << std::endl;
-
-	//std::cout << "wrote " << (int)numberOfBytesWritten << " out of " << table->rowSize * 128 + 16 << std::endl;
-
-
-
-	////CHECK IF THE SAVED BYTES ARE CORRECT
-	//SetFilePointer(fileHandle, 0, NULL, 0);
-
-	//// Allocate memory for the last 8 bytes
-	//void* last8Bytes = malloc(16);
-	//if (!last8Bytes) {
-	//	std::cerr << "Failed to allocate memory" << std::endl;
-	//	CloseHandle(fileHandle);
-	//}
-
-	//// Read the last 8 bytes into the allocated memory
-	//DWORD bytesRead;
-	//result = ReadFile(fileHandle, last8Bytes, 16, &bytesRead, NULL);
-
-	//if (!result)std::cout<<GetLastError()<<std::endl;
-
-	//std::cout << "checking read bytes";
-	//for (int i = 0; i <= 127; i++)
-	//	std::cout << BitwiseHandler::checkBit((uint8_t*)last8Bytes, i);
-	//std::cout << "" << std::endl;
+	if(fileHandle == INVALID_HANDLE_VALUE)	std::cerr << "CreateFileA failed, error: " << GetLastError() << std::endl;
 
 
 	//write tombstones first
@@ -92,6 +45,25 @@ void BufferManager::StoreLevel1(Table* table) {
 	int bufferSize = table->rowSize * bucketPerSegment;
 	int wroteBuckets = 0;
 	int segmentPointer = 512 * (table->L1_registers * ceil(128.f / (double)bucketPerSegment) + 1);// + 1 for the first segment wich is tomstones and bloom filter data
+
+
+	if (128 % bucketPerSegment != 0 && table->L1_registers > 0) {
+		int segment = 128 / bucketPerSegment;
+		int writtenValues = 128 % bucketPerSegment;
+		int offset = 512 * (segment + 1) + writtenValues * table->rowSize;
+		int valuesToWrite = bucketPerSegment - writtenValues;
+		SetFilePointer(fileHandle, offset, 0, NULL);
+		WriteFile(
+			fileHandle,
+			table->values,
+			valuesToWrite * table->rowSize,
+			&numberOfBytesWritten,
+			NULL
+		);
+		wroteBuckets += valuesToWrite;
+		std::cout << "wrote " << writtenValues << " values in the segment with free memory -- table -- " << std::endl;
+	}
+
 	while (wroteBuckets < 128) {
 		SetFilePointer(fileHandle, segmentPointer, NULL, 0);
 		void* buffer = malloc(bufferSize);
@@ -163,14 +135,35 @@ void BufferManager::StoreLevel1(Table* table) {
 		int valuesPerSegment = floor(512.f / double(column->data->numberOfBytes + 1));
 		int bufferSize = (column->data->numberOfBytes + 1) * valuesPerSegment;
 		int wroteValues = 0;
-		int segmentPointer = 512 * (table->L1_registers * ceil(128.f / (double)valuesPerSegment) + 1);// + 1 for the first segment wich is tomstones and bloom filter data
+		int segmentPointer = 512 * (table->L1_registers * ceil(128.f / (double)valuesPerSegment) + 1);//the next unused disk fragment
+
+		//is the last disk segment has free memory left, this if will fill it
+		//first buffer to write that will continue the last one
+		//will be used just if is the second L1_register flush of this table
+		if (128 % valuesPerSegment != 0 && table->L1_registers > 0) {
+			int segment = 128 / valuesPerSegment;
+			int writtenValues = 128 % valuesPerSegment;
+			int offset = 512 * (segment + 1) + writtenValues * (column->data->numberOfBytes + 1);
+			int valuesToWrite = valuesPerSegment - writtenValues;
+			SetFilePointer(fileHandle, offset, 0, NULL);
+			WriteFile(
+				fileHandle,
+				dataToStore,
+				valuesToWrite * (column->data->numberOfBytes + 1),
+				&numberOfBytesWritten,
+				NULL
+			);
+			wroteValues += valuesToWrite;
+			std::cout << "wrote " << writtenValues << " values in the segment with free memory" << std::endl;
+		}
+
 		while (wroteValues < 128) {
 			SetFilePointer(fileHandle, segmentPointer, NULL, 0);
 			static int valuesToWrite;
 			if (wroteValues + valuesPerSegment <= 128) {
 				valuesToWrite = valuesPerSegment;
 			}
-			else {
+			else {//the case for remainig values of a buffer
 				valuesToWrite = 128 - wroteValues;
 			}
 			bool res = WriteFile(
@@ -188,7 +181,7 @@ void BufferManager::StoreLevel1(Table* table) {
 
 		void* bufferT = calloc(5, 1);
 		if (!bufferT) std::cout << "could not allocate memory for bufferT" << std::endl;
-		SetFilePointer(fileHandle, 512 * 2 + 5 * 0, 0 , NULL);
+		SetFilePointer(fileHandle, 512 * 2 + 5 * 1, 0 , NULL);
 		bool res = ReadFile(
 			fileHandle,
 			bufferT,
@@ -197,7 +190,7 @@ void BufferManager::StoreLevel1(Table* table) {
 			NULL
 		);
 		if (!res) std::cout << "test failed " << GetLastError() << std::endl;
-		void* offset = malloc(1);
+		void* offset = calloc(4, 1);
 		void* value = malloc(4);
 		std::memcpy(offset, (char*)bufferT + 4, 1);
 		std::memcpy(value, (char*)bufferT, 4);
