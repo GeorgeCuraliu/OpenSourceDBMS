@@ -4,6 +4,7 @@
 #include <functional>
 
 #include "VoidMemoryHandler.h"
+#include "BloomFilter.h"
 
 class BTNode {
 public:
@@ -84,21 +85,32 @@ public:
 		return -1;
 	}
 
-	void IterrateWithCallback(BTNode* current, std::function<void(void*)> callBack) {
+	void IterrateWithCallback(BTNode* current, std::function<void(BTNode*)> callBack) {
 		if (!current) return;
 
 		IterrateWithCallback(current->left, callBack);
-		callBack(current->value);
+		callBack(current);
 		IterrateWithCallback(current->right, callBack);
 	}
 
 	void GetAllValues(void* buffer) {
 		int i = 0;
 		int size = numberOfBytes + 1;
-		auto addToBuffer = [&i, buffer, &size](void* values) {
-			std::memcpy((char*)buffer + i * (size), values, size);
+		auto addToBuffer = [&i, buffer, &size](BTNode* current) {
+			std::memcpy((char*)buffer + i * (size), current->value, size);
 			i++;
 		};
+		IterrateWithCallback(root, addToBuffer);
+	}
+
+	void GetAllValuesWithBloom(void *buffer, void *bloomData, int bloomSize) {
+		int i = 0;
+		int size = numberOfBytes + 1;
+		auto addToBuffer = [&i, buffer, &size, bloomData, &bloomSize](BTNode* current) {
+			std::memcpy((char*)buffer + i * (size), current->value, size);
+			BloomFilter::AddValue(bloomData, current->getValue(size - 1), size - 1, bloomSize);//-1 for offset byte
+			i++;
+			};
 		IterrateWithCallback(root, addToBuffer);
 	}
 

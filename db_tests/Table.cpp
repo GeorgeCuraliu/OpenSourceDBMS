@@ -64,6 +64,8 @@ void Table::AddRow(void* newData[]) {
 		}
 	}
 
+	if (L1_registers != 0) i += 128;
+
 	int columnsParsed = 0;
 	auto addData = [&columnsParsed, newData, &i](Column* current) {
 		std::cout << "sending offset " << (int)i << std::endl;

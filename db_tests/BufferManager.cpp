@@ -3,6 +3,7 @@
 #include "BufferManager.h"
 #include "Table.h"
 #include "BitwiseHandler.h"
+#include "Parameters.h"
 
 void BufferManager::StoreLevel1(Table* table) {
 
@@ -41,17 +42,22 @@ void BufferManager::StoreLevel1(Table* table) {
 
 
 	//write the actual data
-	int bucketPerSegment = floor(512.f / double(table->rowSize));
-	int bufferSize = table->rowSize * bucketPerSegment;
+	int totalBucketsPerSegment = floor(BUFFER_SIZE / double(table->rowSize));
+	int bucketsPerSegment = floor(BUFFER_SIZE / double(table->rowSize));
+	if (bucketsPerSegment > 128) bucketsPerSegment = 128;
+	int bufferSize = table->rowSize * bucketsPerSegment;
 	int wroteBuckets = 0;
-	int segmentPointer = 512 * (table->L1_registers * ceil(128.f / (double)bucketPerSegment) + 1);// + 1 for the first segment wich is tomstones and bloom filter data
+	int segmentPointer = BUFFER_SIZE * (table->L1_registers * ceil(128.f / (double)bucketsPerSegment)) + SEGMENT_SIZE;// SEGMENT_SIZE for the first segment wich is tomstones and bloom filter data
 
 
-	if (128 % bucketPerSegment != 0 && table->L1_registers > 0) {
-		int segment = 128 / bucketPerSegment;
-		int writtenValues = 128 % bucketPerSegment;
-		int offset = 512 * (segment + 1) + writtenValues * table->rowSize;
-		int valuesToWrite = bucketPerSegment - writtenValues;
+	if ((128 % bucketsPerSegment != 0  > 0 || bufferSize < 4096 ) && table->L1_registers) {
+		int segment = 128 / bucketsPerSegment;
+		int writtenValues;
+		if (bucketsPerSegment == 128) writtenValues = bucketsPerSegment;
+		else writtenValues = 128 % bucketsPerSegment;
+		int offset = BUFFER_SIZE * (segment - 1) + writtenValues * table->rowSize + SEGMENT_SIZE;//-1 for the first segment, wich is metadata
+		int valuesToWrite = totalBucketsPerSegment - writtenValues;
+		if (valuesToWrite > 128) valuesToWrite = 128;
 		SetFilePointer(fileHandle, offset, 0, NULL);
 		WriteFile(
 			fileHandle,
@@ -76,14 +82,14 @@ void BufferManager::StoreLevel1(Table* table) {
 			&numberOfBytesWritten,
 			NULL
 		);
-		wroteBuckets += bucketPerSegment;
-		std::cout << "wrote " << (int)numberOfBytesWritten << " bytes out of " << bufferSize << " -- total buckets wrote " << wroteBuckets << " -- segment pointer " << segmentPointer << " (" << segmentPointer / 512 << ")" << std::endl;
-		segmentPointer += 512;
+		wroteBuckets += bucketsPerSegment;
+		std::cout << "wrote " << (int)numberOfBytesWritten << " bytes out of " << bufferSize << " -- total buckets wrote " << wroteBuckets << " -- segment pointer " << segmentPointer << " (" << segmentPointer / BUFFER_SIZE << ")" << std::endl;
+		segmentPointer += BUFFER_SIZE;
 	}
 
 
 	void* bufferT = calloc(8, 1);
-	SetFilePointer(fileHandle, 512 * 2 + 8 * 6, 0, NULL);
+	SetFilePointer(fileHandle, 512 * 1 + 8 * 4, 0, NULL);
 	bool res = ReadFile(
 		fileHandle,
 		bufferT,
@@ -104,8 +110,10 @@ void BufferManager::StoreLevel1(Table* table) {
 
 	auto storeColumns = [table](Column* column) {
 		void* dataToStore = malloc((column->data->numberOfBytes + 1) * 128);
+		void* bloomFilter = calloc(SEGMENT_SIZE, 1);
 		if (!dataToStore) std::cout << "could not allocate memory for dataToStore" << std::endl;
-		column->data->GetAllValues(dataToStore);
+		//column->data->GetAllValues(dataToStore);
+		column->data->GetAllValuesWithBloom(dataToStore, bloomFilter, SEGMENT_SIZE * 8); // * 8 to transofrm from bytes to bits
 
 		size_t tableNameLen = std::strlen(table->name);
 		size_t columnNameLen = std::strlen(column->name);
@@ -131,20 +139,36 @@ void BufferManager::StoreLevel1(Table* table) {
 		);
 		if (fileHandle == INVALID_HANDLE_VALUE) std::cout << "couldnt open the file " << fileName << " ERROR " << GetLastError() << std::endl;
 
+		//write the bloom filter data
 		DWORD numberOfBytesWritten = 0;
-		int valuesPerSegment = floor(512.f / double(column->data->numberOfBytes + 1));
+		WriteFile(
+			fileHandle,
+			bloomFilter,
+			SEGMENT_SIZE,
+			&numberOfBytesWritten,
+			NULL
+		);
+		std::cout << "wrote " << numberOfBytesWritten << " bytes of bloom filter data out of " << SEGMENT_SIZE << std::endl;
+		
+		int totalValuesPerSegment = floor(BUFFER_SIZE / double(column->data->numberOfBytes + 1));
+		int valuesPerSegment;
+		if (totalValuesPerSegment > 128) valuesPerSegment = 128;
+		else valuesPerSegment = totalValuesPerSegment;
 		int bufferSize = (column->data->numberOfBytes + 1) * valuesPerSegment;
 		int wroteValues = 0;
-		int segmentPointer = 512 * (table->L1_registers * ceil(128.f / (double)valuesPerSegment) + 1);//the next unused disk fragment
+		int segmentPointer = BUFFER_SIZE * (table->L1_registers * ceil(128.f / (double)valuesPerSegment)) + SEGMENT_SIZE;//the next unused disk fragment
 
 		//is the last disk segment has free memory left, this if will fill it
 		//first buffer to write that will continue the last one
 		//will be used just if is the second L1_register flush of this table
-		if (128 % valuesPerSegment != 0 && table->L1_registers > 0) {
+		if ((128 % valuesPerSegment != 0 || totalValuesPerSegment > 128) && table->L1_registers > 0) {
 			int segment = 128 / valuesPerSegment;
-			int writtenValues = 128 % valuesPerSegment;
-			int offset = 512 * (segment + 1) + writtenValues * (column->data->numberOfBytes + 1);
-			int valuesToWrite = valuesPerSegment - writtenValues;
+			int writtenValues;
+			if (valuesPerSegment == 128) writtenValues = valuesPerSegment;
+			else writtenValues = 128 % valuesPerSegment;
+			int offset = BUFFER_SIZE * (segment - 1) + writtenValues * (column->data->numberOfBytes + 1) + SEGMENT_SIZE;
+			int valuesToWrite = totalValuesPerSegment - writtenValues;
+			if (valuesToWrite > 128) valuesToWrite = 128;
 			SetFilePointer(fileHandle, offset, 0, NULL);
 			WriteFile(
 				fileHandle,
@@ -175,13 +199,13 @@ void BufferManager::StoreLevel1(Table* table) {
 			);
 			if (!res) std::cout << "could not write the buffer for file " << fileName << " ERROR " << GetLastError() << std::endl;
 			wroteValues += valuesToWrite;
-			std::cout << "column " << column->name << " wrote " << (int)numberOfBytesWritten << " bytes out of " << bufferSize << " -- total buckets wrote " << wroteValues << " -- segment pointer " << segmentPointer << " (" << segmentPointer / 512 << ")" << std::endl;
-			segmentPointer += 512;
+			std::cout << "column " << column->name << " wrote " << (int)numberOfBytesWritten << " bytes out of " << bufferSize << " -- total buckets wrote " << wroteValues << " -- segment pointer " << segmentPointer << " (" << segmentPointer / BUFFER_SIZE << ")" << std::endl;
+			segmentPointer += BUFFER_SIZE;
 		}
 
 		void* bufferT = calloc(5, 1);
 		if (!bufferT) std::cout << "could not allocate memory for bufferT" << std::endl;
-		SetFilePointer(fileHandle, 512 * 2 + 5 * 1, 0 , NULL);
+		SetFilePointer(fileHandle, 512 * 1 + 5 * 8, 0 , NULL);
 		bool res = ReadFile(
 			fileHandle,
 			bufferT,
@@ -206,5 +230,13 @@ void BufferManager::StoreLevel1(Table* table) {
 		free(value);
 	};
 	table->columns.IterateWithCallback(storeColumns);
+
+}
+
+
+
+
+void BufferManager::SearchLevel1(Table* table, char* columnName, void* values[], int argumentsNumber){
+
 
 }
