@@ -1,5 +1,6 @@
 #pragma once
 
+#include "Column.h"
 #include "BufferManager.h"
 #include "Table.h"
 #include "BitwiseHandler.h"
@@ -113,7 +114,6 @@ void BufferManager::StoreLevel1(Table* table) {
 		void* bloomFilter = calloc(SEGMENT_SIZE, 1);
 		if (!dataToStore) std::cout << "could not allocate memory for dataToStore" << std::endl;
 		//column->data->GetAllValues(dataToStore);
-		column->data->GetAllValuesWithBloom(dataToStore, bloomFilter, SEGMENT_SIZE * 8); // * 8 to transofrm from bytes to bits
 
 		size_t tableNameLen = std::strlen(table->name);
 		size_t columnNameLen = std::strlen(column->name);
@@ -139,8 +139,27 @@ void BufferManager::StoreLevel1(Table* table) {
 		);
 		if (fileHandle == INVALID_HANDLE_VALUE) std::cout << "couldnt open the file " << fileName << " ERROR " << GetLastError() << std::endl;
 
+		//retrieve first bloom filtre, if it should exist
+		if (table->L1_registers != 0) {
+			DWORD readBytes;
+			SetFilePointer(fileHandle, 0, 0, NULL);
+			bool res = ReadFile(
+				fileHandle,
+				bloomFilter,
+				SEGMENT_SIZE,
+				&readBytes,
+				NULL
+			);
+			std::cout << "read " << readBytes << " bytes of the bloomFilter to update it" << std::endl;
+
+		}
+
+		column->data->GetAllValuesWithBloom(dataToStore, bloomFilter, SEGMENT_SIZE);
+
+
 		//write the bloom filter data
 		DWORD numberOfBytesWritten = 0;
+		SetFilePointer(fileHandle, 0, 0, NULL);
 		WriteFile(
 			fileHandle,
 			bloomFilter,
@@ -205,7 +224,7 @@ void BufferManager::StoreLevel1(Table* table) {
 
 		void* bufferT = calloc(5, 1);
 		if (!bufferT) std::cout << "could not allocate memory for bufferT" << std::endl;
-		SetFilePointer(fileHandle, 512 * 1 + 5 * 8, 0 , NULL);
+		SetFilePointer(fileHandle, 512 * 1 + 5 * 100, 0 , NULL);
 		bool res = ReadFile(
 			fileHandle,
 			bufferT,
@@ -236,7 +255,86 @@ void BufferManager::StoreLevel1(Table* table) {
 
 
 
-void BufferManager::SearchLevel1(Table* table, char* columnName, void* values[], int argumentsNumber){
+void BufferManager::SearchLevel1(Table* table, Column* column, void* values[], int argumentsNumber, std::vector<int> *foundValues){
+	
+	size_t tableNameLen = std::strlen(table->name);
+	size_t columnNameLen = std::strlen(column->name);
+	char* fileName = (char*)calloc(tableNameLen + columnNameLen + 2, sizeof(char)); // +1 for null terminator
+	if (!fileName) {
+		std::cerr << "Memory allocation failed!" << std::endl;
+		return;  // Handle allocation failure
+	}
 
+	std::memcpy(fileName, table->name, tableNameLen);
+	fileName[tableNameLen] = '&';
+	std::memcpy(fileName + tableNameLen + 1, column->name, columnNameLen);
+	fileName[tableNameLen + columnNameLen + 1] = '\0';
+
+	std::cout << "searching in file " << fileName << std::endl;
+
+	HANDLE fileHandle;
+	fileHandle = CreateFileA(
+		(LPCSTR)fileName,
+		GENERIC_ALL,
+		FILE_SHARE_READ,
+		NULL,
+		OPEN_ALWAYS,
+		FILE_ATTRIBUTE_NORMAL,
+		NULL
+	);
+
+	void* bloomBuffer = calloc(SEGMENT_SIZE, 1);
+	DWORD readBytes;
+
+	bool res = ReadFile(
+		fileHandle,
+		bloomBuffer,
+		SEGMENT_SIZE,
+		&readBytes,
+		NULL
+	);
+
+	std::cout << "read " << readBytes << " bytes of bloom filter out of " << SEGMENT_SIZE << std::endl;
+
+	for (int i = 0; i < argumentsNumber; i++) {
+		bool result = BloomFilter::CheckValue(bloomBuffer, values[i], column->data->numberOfBytes, SEGMENT_SIZE);
+		if (result) std::cout << "value could be in L1 registers" << std::endl;
+		else std::cout << "value not there" << std::endl;
+
+		if (result) {
+
+			int bufferSize;
+			if ((column->data->numberOfBytes + 1) * 128 * table->L1_registers < BUFFER_SIZE)
+				bufferSize = (column->data->numberOfBytes + 1) * 128 * table->L1_registers;
+			else
+				bufferSize = BUFFER_SIZE;
+
+			void* buffer = calloc(bufferSize, 1);
+			DWORD numberOfBytesRead;
+
+			SetFilePointer(fileHandle, SEGMENT_SIZE, 0, 0);
+			res = ReadFile(
+				fileHandle,
+				buffer,
+				bufferSize,
+				&numberOfBytesRead,
+				NULL
+				);
+
+			for (int j = 0; j < 128 * table->L1_registers; j++) {
+				void* value = malloc(column->data->numberOfBytes);
+				void* offset = calloc(4, 1);
+				if (!value || !offset || !buffer) return;
+				std::memcpy(value, (uint8_t*)buffer + j * (column->data->numberOfBytes + 1), column->data->numberOfBytes);
+				std::memcpy(offset, (uint8_t*)buffer + j * (column->data->numberOfBytes + 1) + column->data->numberOfBytes, 1);
+
+				int comp = VoidMemoryHandler::COMPARE(values[i], value, column->data->dataType);
+				if (comp == 0) {
+					std::cout << "found match at offset " << *(int*)offset << std::endl;
+					foundValues->push_back(*(int*)offset);
+				}
+			}
+		}
+	}
 
 }

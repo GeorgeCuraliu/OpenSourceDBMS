@@ -70,19 +70,20 @@ public:
 		}
 
 	}
-	uint8_t FindValue(void* value) {
+	bool FindValue(void* value, uint8_t& offset) {
 		BTNode* temp = root;
 		while (temp) {
 			int comparationResult = VoidMemoryHandler::COMPARE(value, temp->getValue(numberOfBytes), dataType);
 			std::cout << comparationResult << std::endl;
 			if (comparationResult == 0) {
 				std::cout << "found bucket at offset " << (int)temp->getOffset(numberOfBytes) << std::endl;
-				return temp->getOffset(numberOfBytes);
+				offset = temp->getOffset(numberOfBytes);
+				return true;
 			}
 			else if (comparationResult == -1) temp = temp->left;
 			else if (comparationResult == 1) temp = temp->right;
 		}
-		return -1;
+		return false;
 	}
 
 	void IterrateWithCallback(BTNode* current, std::function<void(BTNode*)> callBack) {

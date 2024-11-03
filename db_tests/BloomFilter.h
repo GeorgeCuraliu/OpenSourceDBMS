@@ -5,18 +5,7 @@
 #include "BitwiseHandler.h"
 
 class BloomFilter {
-public:
-	static void AddValue(void* bloomData, void* newValue, size_t dataSize, int bloomSize) {
-        BitwiseHandler::setBit((uint8_t*)bloomData, djb2_hash(newValue, dataSize, bloomSize));
-        BitwiseHandler::setBit((uint8_t*)bloomData, fnv1a_hash(newValue, dataSize, bloomSize));
-        BitwiseHandler::setBit((uint8_t*)bloomData, simple_modular_hash(newValue, dataSize, bloomSize));
-
- /*       std::cout << "new data with hash " <<
-            djb2_hash(newValue, dataSize, bloomSize) << " " <<
-            fnv1a_hash(newValue, dataSize, bloomSize) << " " <<
-            simple_modular_hash(newValue, dataSize, bloomSize) << std::endl;*/
-	}
-
+private:
 
     static unsigned int djb2_hash(const void* data, size_t size, unsigned int n) {
         if (size == 0 || n == 0) return 0;
@@ -55,4 +44,31 @@ public:
 
         return hash % n;
     }
+
+public:
+	static void AddValue(void* bloomData, void* newValue, size_t valueSize, int bloomSize) {
+        BitwiseHandler::setBit((uint8_t*)bloomData, djb2_hash(newValue, valueSize, bloomSize * 8));
+        BitwiseHandler::setBit((uint8_t*)bloomData, fnv1a_hash(newValue, valueSize, bloomSize * 8));
+        BitwiseHandler::setBit((uint8_t*)bloomData, simple_modular_hash(newValue, valueSize, bloomSize * 8));
+
+        if(*(int*)newValue == 8 || *(int*)newValue == 200)
+        std::cout << "new data with hash " <<
+            djb2_hash(newValue, valueSize, bloomSize) << " " <<
+            fnv1a_hash(newValue, valueSize, bloomSize) << " " <<
+            simple_modular_hash(newValue, valueSize, bloomSize) << std::endl;
+	}
+
+    static bool CheckValue(void* bloomData, void* value, size_t valueSize, int bloomSize) {
+        bool bit0 = BitwiseHandler::checkBit((uint8_t*)bloomData, djb2_hash(value, valueSize, bloomSize * 8));
+        bool bit1 = BitwiseHandler::checkBit((uint8_t*)bloomData, fnv1a_hash(value, valueSize, bloomSize * 8));
+        bool bit2 = BitwiseHandler::checkBit((uint8_t*)bloomData, simple_modular_hash(value, valueSize, bloomSize * 8));
+        std::cout << bit0 << bit1 << bit2 << std::endl;
+        std::cout << "data has hash " <<
+            djb2_hash(value, valueSize, bloomSize) << " " <<
+            fnv1a_hash(value, valueSize, bloomSize) << " " <<
+            simple_modular_hash(value, valueSize, bloomSize) << std::endl;
+        if (bit0 && bit1 && bit2) return true;
+        return false;
+    }
+
 };

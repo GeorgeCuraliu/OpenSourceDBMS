@@ -24,7 +24,7 @@ public:
 		}
 	}
 
-	void IterateWithCallback(std::function<void(Column*)> callBackFunc) {
+	void IterateWithCallback(std::function<void(t*)> callBackFunc) {
 		Column* temp = head;
 		while (temp) {
 			callBackFunc(temp);

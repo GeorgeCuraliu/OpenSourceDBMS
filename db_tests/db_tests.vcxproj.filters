@@ -68,7 +68,7 @@
     <ClInclude Include="LinkedList.h">
       <Filter>Header Files\lsm_tree</Filter>
     </ClInclude>
-    <ClInclude Include="Conditions.h">
+    <ClInclude Include="Query.h">
       <Filter>Header Files\lsm_tree</Filter>
     </ClInclude>
     <ClInclude Include="Parameters.h">

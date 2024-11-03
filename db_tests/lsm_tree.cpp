@@ -7,7 +7,7 @@
 #include <fileapi.h>
 
 #include "Table.h"
-#include "Conditions.h"
+#include "Query.h"
 #include "Parameters.h"
 
 
@@ -69,9 +69,10 @@ int main(int argc, char* argv[]) {
 
 	uint32_t* a11 = (uint32_t*)malloc(sizeof(uint32_t));
 	uint32_t* a22 = (uint32_t*)malloc(sizeof(uint32_t));
-	*a11 = 1;
-	*a22 = 0;
+	*a11 = 220;
+	*a22 = 89;
 	void* argss[] = { a11, a22 };
-	//Conditions::equals(&table, (char*)"c1", argss, 2);
-
+	//Query::equals(&table, (char*)"c1", argss, 2);
+	Query* query = new Query();
+	query->FindByComparator(&table, (char*)"c1", argss, 2, EQUALS | BIGGER, AND);
 }
