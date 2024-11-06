@@ -255,7 +255,7 @@ void BufferManager::StoreLevel1(Table* table) {
 
 
 
-void BufferManager::SearchLevel1(Table* table, Column* column, void* values[], int argumentsNumber, std::vector<int> *foundValues){
+void BufferManager::SearchLevel1(Table* table, Column* column, void* values[], int argumentsNumber, std::vector<int>& foundValues, int comparator){
 	
 	size_t tableNameLen = std::strlen(table->name);
 	size_t columnNameLen = std::strlen(column->name);
@@ -301,7 +301,7 @@ void BufferManager::SearchLevel1(Table* table, Column* column, void* values[], i
 		if (result) std::cout << "value could be in L1 registers" << std::endl;
 		else std::cout << "value not there" << std::endl;
 
-		if (result) {
+		if (result || (comparator & (BIGGER | LESS | NOT))) {
 
 			int bufferSize;
 			if ((column->data->numberOfBytes + 1) * 128 * table->L1_registers < BUFFER_SIZE)
@@ -328,13 +328,15 @@ void BufferManager::SearchLevel1(Table* table, Column* column, void* values[], i
 				std::memcpy(value, (uint8_t*)buffer + j * (column->data->numberOfBytes + 1), column->data->numberOfBytes);
 				std::memcpy(offset, (uint8_t*)buffer + j * (column->data->numberOfBytes + 1) + column->data->numberOfBytes, 1);
 
-				int comp = VoidMemoryHandler::COMPARE(values[i], value, column->data->dataType);
-				if (comp == 0) {
+				int comp = VoidMemoryHandler::COMPARE(value, values[i], column->data->dataType);
+				if (comp & comparator) {
 					std::cout << "found match at offset " << *(int*)offset << std::endl;
-					foundValues->push_back(*(int*)offset);
+					foundValues.push_back(*(int*)offset);
 				}
 			}
+			free(buffer);
 		}
 	}
-
+	free(fileName);
+	CloseHandle(fileHandle);
 }

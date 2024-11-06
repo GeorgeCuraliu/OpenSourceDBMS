@@ -31,5 +31,28 @@ public:
 			temp = temp->next;
 		}
 	}
+	void DeleteNode(t* node) {
+		if (node == head) {
+			t* oldhead = head;
+			head = head->next;
+			delete oldhead;
+		}
+		t* temp = head;
+		while (temp->next != node)
+			temp = temp->next;
+		t* toDelete = temp->next;
+		temp->next = toDelete->next;
+		delete toDelete;
+
+	}
+	void DeleteList() {
+		t* temp = head;
+		while (temp) {
+			t* toDelete = temp;
+			temp = temp->next;
+			delete toDelete;
+		}
+		tail = nullptr;
+	}
 
 };

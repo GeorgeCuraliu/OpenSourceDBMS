@@ -23,29 +23,29 @@ int main(int argc, char* argv[]) {
 	table.ConfirmDiagram();
 	table.DisplayColumns();
 	
-	//uint32_t* data1 = (uint32_t*)malloc(sizeof(uint32_t));
-	//*data1 = 1;
-	//uint32_t* data2 = (uint32_t*)malloc(sizeof(uint32_t));
-	//*data2 = 10;
-	//void* newData[] = { data1, data2 };
+/*	uint32_t* data1 = (uint32_t*)malloc(sizeof(uint32_t));
+	*data1 = 3;
+	uint32_t* data2 = (uint32_t*)malloc(sizeof(uint32_t));
+	*data2 = 13;
+	void* newData[] = { data1, data2 };
 
-	//uint32_t* data11 = (uint32_t*)malloc(sizeof(uint32_t));
-	//*data11 = 2;
-	//uint32_t* data22 = (uint32_t*)malloc(sizeof(uint32_t));
-	//*data22 = 11;
-	//void* newData2[] = { data11, data22 };
+	uint32_t* data11 = (uint32_t*)malloc(sizeof(uint32_t));
+	*data11 = 2;
+	uint32_t* data22 = (uint32_t*)malloc(sizeof(uint32_t));
+	*data22 = 11;
+	void* newData2[] = { data11, data22 };
 
-	//uint32_t* data111 = (uint32_t*)malloc(sizeof(uint32_t));
-	//*data111 = 3;
-	//uint32_t* data222 = (uint32_t*)malloc(sizeof(uint32_t));
-	//*data222 = 12;
-	//void* newData3[] = { data111, data222 };
+	uint32_t* data111 = (uint32_t*)malloc(sizeof(uint32_t));
+	*data111 = 3;
+	uint32_t* data222 = (uint32_t*)malloc(sizeof(uint32_t));
+	*data222 = 12;
+	void* newData3[] = { data111, data222 };
 
-	//table.AddRow(newData);
-	//table.AddRow(newData2);
-	//table.AddRow(newData3);
+	table.AddRow(newData);
+	table.AddRow(newData2);
+	table.AddRow(newData3);
 
-	//table.DisplayAllRows();
+	table.DisplayAllRows();*/
 
 	//uint32_t* a1 = (uint32_t*)malloc(sizeof(uint32_t));
 	//*a1 = 2;
@@ -69,10 +69,23 @@ int main(int argc, char* argv[]) {
 
 	uint32_t* a11 = (uint32_t*)malloc(sizeof(uint32_t));
 	uint32_t* a22 = (uint32_t*)malloc(sizeof(uint32_t));
-	*a11 = 220;
+	uint32_t* a33 = (uint32_t*)malloc(sizeof(uint32_t));
+	*a11 = 2;
 	*a22 = 89;
-	void* argss[] = { a11, a22 };
+	*a33 = 100;
+	void* argss[] = { a11};
+	
+	uint32_t* a111 = (uint32_t*)malloc(sizeof(uint32_t));
+	uint32_t* a222 = (uint32_t*)malloc(sizeof(uint32_t));
+	uint32_t* a333 = (uint32_t*)malloc(sizeof(uint32_t));
+	*a111 = 1 * 200;
+	*a222 = 89 * 200;
+	*a333 = 100 * 200;
+	void* argsss[] = { a111};
+
 	//Query::equals(&table, (char*)"c1", argss, 2);
 	Query* query = new Query();
-	query->FindByComparator(&table, (char*)"c1", argss, 2, EQUALS | BIGGER, AND);
+	query->FindByComparator(&table, (char*)"c1", argss, 1, EQUALS | LESS);
+	query->FindByComparator(&table, (char*)"c2", argsss, 1, EQUALS);
+	query->CompareQueries(AND);
 }

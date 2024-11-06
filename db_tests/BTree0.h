@@ -51,7 +51,7 @@ public:
 
 		BTNode* temp = root;
 		while (temp) {
-			if (VoidMemoryHandler::COMPARE(value, temp->getValue(numberOfBytes), dataType) <= 0) {
+			if (VoidMemoryHandler::COMPARE(value, temp->getValue(numberOfBytes), dataType) & (EQUALS | LESS)) {
 				//std::cout << (int)temp->getOffset(numberOfBytes) << " left " << std::endl;
 				if (temp->left == nullptr) {
 					temp->left = newNode;

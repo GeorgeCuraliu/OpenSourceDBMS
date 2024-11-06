@@ -2,13 +2,15 @@
 
 #include <iostream>
 
+#include "Parameters.h"
+
 class VoidMemoryHandler {
 protected:
 	static int COMPARE_INT(void* argument1, void* argument2) {
 		//std::cout << "arguments " << *(int*)argument1 << " " << *(int*)argument2 << std::endl;
-		if (*(int*)argument1 < *(int*)argument2) return -1;
-		if (*(int*)argument1 == *(int*)argument2) return 0;
-		if (*(int*)argument1 > *(int*)argument2) return 1;
+		if (*(int*)argument1 < *(int*)argument2) return LESS;
+		if (*(int*)argument1 == *(int*)argument2) return EQUALS;
+		if (*(int*)argument1 > *(int*)argument2) return BIGGER;
 	}
 public:
 	static void INT(void* memory) {
