@@ -77,20 +77,20 @@ public:
 		auto columnParser = [this ,columnName, table, &argumentsNumber, values, comparator](Column* currentColumn) {
 			if (strcmp(currentColumn->name, columnName) == 0) {
 				QueryData* foundData = new QueryData();
+
 				//check L0 register
 				for (int i = 0; i < argumentsNumber; i++) {
-					uint8_t offset;
-					bool res = currentColumn->data->FindValue(values[i], offset);
-					if (res) table->DisplayRow(offset);
+					currentColumn->data->FindValues(values[i], foundData->L0_results, comparator);
 				}
 
 				//check L1 registers
 				if (table->L1_registers != 0) {
-
 					BufferManager::SearchLevel1(table, currentColumn, values, argumentsNumber, foundData->L1_results, comparator);
-
 				}
-				std::cout << foundData->L1_results.size() << " aw" << std::endl;
+				std::cout << foundData->L0_results.size() << " aw" << std::endl;
+				for (int i = 0; i < foundData->L0_results.size(); i++) {
+					std::cout << foundData->L0_results.at(i) << std::endl;
+				}
 				querriesResults->AddNode(foundData);
 			}
 			};
