@@ -52,7 +52,8 @@ public:
 
 		BTNode* temp = root;
 		while (temp) {
-			if (VoidMemoryHandler::COMPARE(value, temp->getValue(numberOfBytes), dataType) | (EQUALS | LESS)) {
+			int comp = VoidMemoryHandler::COMPARE(value, temp->getValue(numberOfBytes), dataType);
+			if (comp & (EQUALS | LESS)) {
 				std::cout << (int)temp->getOffset(numberOfBytes) << " left " << std::endl;
 				if (temp->left == nullptr) {
 					temp->left = newNode;
@@ -74,7 +75,7 @@ public:
 	void FindValues(void* value, std::vector<int>& foundValues, int comparator) {
 
 		auto GetOffsetsFromSubtree = [this, &foundValues](BTNode* current) {
-			std::cout << "found match at offset " << current->getOffset(numberOfBytes) << " " << *(int*)current->getValue(numberOfBytes) << std::endl;
+			std::cout << "found match at offset " << (int)current->getOffset(numberOfBytes) << " " << *(int*)current->getValue(numberOfBytes) << std::endl;
 			foundValues.push_back(current->getOffset(numberOfBytes));
 			};
 
@@ -83,10 +84,9 @@ public:
 			int comparationResult = VoidMemoryHandler::COMPARE(temp->getValue(numberOfBytes), value, dataType);
 
 			//just add the offset if it matches the equals comparator
-			if (comparator == EQUALS && comparationResult == EQUALS) {
+			if (comparator & EQUALS && comparationResult == EQUALS) {
 				foundValues.push_back((int)temp->getOffset(numberOfBytes));
 				std::cout << "found match at -equals- offset " << (int)temp->getOffset(numberOfBytes) << " " << *(int*)temp->getValue(numberOfBytes) << std::endl;
-				temp = temp->left;
 			}
 			//iterate the entire subtree that matches the description
 			if (comparator & comparationResult) {
@@ -98,6 +98,9 @@ public:
 					IterrateWithCallback(temp->right, GetOffsetsFromSubtree);
 					temp = temp->left;
 				}
+			}
+			else {
+				temp = temp->left;
 			}
 
 			

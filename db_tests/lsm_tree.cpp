@@ -63,30 +63,44 @@ void test1(Table& table) {
 void test2(Table& table) {
 	int* a1 = (int*)malloc(4);
 	int* a2 = (int*)malloc(4);
-	*a1 = 2;
+	*a1 = 10;
 	*a2 = 5;
 	void* argss[] = { a1, a2 };
 	table.AddRow(argss);
 
 	int* a11 = (int*)malloc(4);
 	int* a21 = (int*)malloc(4);
-	*a11 = 1;
+	*a11 = 5;
 	*a21 = 6;
 	void* argss0[] = { a11, a21 };
 	table.AddRow(argss0);
 
 	int* a12 = (int*)malloc(4);
 	int* a22 = (int*)malloc(4);
-	*a12 = 3;
+	*a12 = 8;
 	*a22 = 7;
 	void* argss1[] = { a12, a22 };
 	table.AddRow(argss1);
 
+	int* a172 = (int*)malloc(4);
+	int* a272 = (int*)malloc(4);
+	*a172 = 7;
+	*a272 = 1;
+	void* argss17[] = { a172, a272 };
+	table.AddRow(argss17);
+
+	int* a128 = (int*)malloc(4);
+	int* a228 = (int*)malloc(4);
+	*a128 = 2;
+	*a228 = 7;
+	void* argss18[] = { a128, a228 };
+	table.AddRow(argss18);
+
 
 	int* a15 = (int*)malloc(4);
-	*a15 = 2;
+	*a15 = 20;
 	void* argssq[] = { a15};
 	Query* query = new Query();
-	query->FindByComparator(&table, (char*)"c1", argssq, 1, EQUALS | BIGGER);
+	query->FindByComparator(&table, (char*)"c1", argssq, 1, EQUALS | LESS);
 
 }
