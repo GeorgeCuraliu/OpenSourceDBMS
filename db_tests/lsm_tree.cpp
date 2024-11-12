@@ -10,6 +10,11 @@
 #include "Query.h"
 #include "Parameters.h"
 
+//check memory leaks
+#define _CRTDBG_MAP_ALLOC
+#include <stdlib.h>
+#include <crtdbg.h>
+
 
 void test1(Table& table);
 void test2(Table& table);
@@ -25,10 +30,20 @@ int main(int argc, char* argv[]) {
 	table.DisplayColumns();
 
 	test1(table);
+
+	_CrtSetReportMode(_CRT_WARN, _CRTDBG_MODE_FILE);
+	_CrtSetReportFile(_CRT_WARN, _CRTDBG_FILE_STDOUT);
+	_CrtSetReportMode(_CRT_ERROR, _CRTDBG_MODE_FILE);
+	_CrtSetReportFile(_CRT_ERROR, _CRTDBG_FILE_STDOUT);
+	_CrtSetReportMode(_CRT_ASSERT, _CRTDBG_MODE_FILE);
+	_CrtSetReportFile(_CRT_ASSERT, _CRTDBG_FILE_STDOUT);
+	_CrtDumpMemoryLeaks();
+
+	return 0;
 }
 
 void test1(Table& table) {
-	for (int i = 0; i < 2 * 128 + 20; i++) {
+	for (int i = 0; i < 2 * 128; i++) {
 		int* a1 = (int*)malloc(4);
 		int* a2 = (int*)malloc(4);
 		*a1 = i;

@@ -8,6 +8,7 @@
 #include "Parameters.h"
 #include "BitwiseHandler.h"
 
+
 Table::Table(char* name, uint8_t L1_registers, uint8_t L2_registers) :
 	numberOfValues(0),
 	numberOfColumns(0),

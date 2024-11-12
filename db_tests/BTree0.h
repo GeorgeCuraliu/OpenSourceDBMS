@@ -152,11 +152,11 @@ public:
 		if (current->right) FlushData(current->right);
 		std::cout << "deleting " << *(int*)current->getValue(numberOfBytes) << std::endl;
 		if (current == root && current != nullptr) {
-			free(root);
+			delete root;
 			root = nullptr;
 		}
 		else if(current == nullptr) {
-			free(current);
+			delete current;
 		}
 		
 		//if (current == nullptr) return;
