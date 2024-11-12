@@ -86,6 +86,7 @@ void BufferManager::StoreLevel1(Table* table) {
 		wroteBuckets += bucketsPerSegment;
 		std::cout << "wrote " << (int)numberOfBytesWritten << " bytes out of " << bufferSize << " -- total buckets wrote " << wroteBuckets << " -- segment pointer " << segmentPointer << " (" << segmentPointer / BUFFER_SIZE << ")" << std::endl;
 		segmentPointer += BUFFER_SIZE;
+		free(buffer);
 	}
 
 
@@ -108,6 +109,8 @@ void BufferManager::StoreLevel1(Table* table) {
 
 
 	CloseHandle(fileHandle);
+	free(fileName);
+	free(bufferT);
 
 	auto storeColumns = [table](Column* column) {
 		void* dataToStore = malloc((column->data->numberOfBytes + 1) * 128);
@@ -242,7 +245,8 @@ void BufferManager::StoreLevel1(Table* table) {
 
 		CloseHandle(fileHandle);
 
-		//free(dataToStore);
+		free(bloomFilter);
+		free(dataToStore);
 		free(fileName);
 		free(bufferT);
 		free(offset);

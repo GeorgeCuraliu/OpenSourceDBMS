@@ -30,6 +30,9 @@ public:
 		std::memcpy(&offset, (uint8_t*)value + valueSize, 1); // Read the last byte as the offset
 		return offset;
 	}
+	~BTNode() {
+		free(value);
+	}
 };
 
 
@@ -82,14 +85,18 @@ public:
 		BTNode* temp = root;
 		while (temp) {
 			int comparationResult = VoidMemoryHandler::COMPARE(temp->getValue(numberOfBytes), value, dataType);
+			bool currentValue = false;
 
 			//just add the offset if it matches the equals comparator
 			if (comparator & EQUALS && comparationResult == EQUALS) {
 				foundValues.push_back((int)temp->getOffset(numberOfBytes));
 				std::cout << "found match at -equals- offset " << (int)temp->getOffset(numberOfBytes) << " " << *(int*)temp->getValue(numberOfBytes) << std::endl;
+				currentValue = true;
 			}
 			//iterate the entire subtree that matches the description
 			if (comparator & comparationResult) {
+				if (!currentValue)
+					foundValues.push_back((int)temp->getOffset(numberOfBytes));
 				if (comparator & LESS) {
 					IterrateWithCallback(temp->left, GetOffsetsFromSubtree);
 					temp = temp->right;
@@ -138,18 +145,24 @@ public:
 	}
 
 	void FlushData(BTNode* current = nullptr) {
+		if (root == nullptr) return;
 		if (current == nullptr) current = root;
 		if (current == nullptr) return;
 		if (current->left) FlushData(current->left);
 		if (current->right) FlushData(current->right);
-		
+		std::cout << "deleting " << *(int*)current->getValue(numberOfBytes) << std::endl;
 		if (current == root && current != nullptr) {
-			delete root;
+			free(root);
 			root = nullptr;
 		}
 		else if(current == nullptr) {
-			delete current;
+			free(current);
 		}
 		
+		//if (current == nullptr) return;
+		//FlushData(current->right);
+		//FlushData(current->left);
+		//delete current;
+
 	}
 };

@@ -24,11 +24,11 @@ int main(int argc, char* argv[]) {
 	table.ConfirmDiagram();
 	table.DisplayColumns();
 
-	test2(table);
+	test1(table);
 }
 
 void test1(Table& table) {
-	for (int i = 0; i < 2 * 128; i++) {
+	for (int i = 0; i < 2 * 128 + 20; i++) {
 		int* a1 = (int*)malloc(4);
 		int* a2 = (int*)malloc(4);
 		*a1 = i;
@@ -36,12 +36,15 @@ void test1(Table& table) {
 		void* argss[] = { a1, a2 };
 		std::cout << "adding " << *(int*)a1 << " " << *(int*)a2 << std::endl;
 		table.AddRow(argss);
+		free(a1);
+		free(a2);
+		//free(argss);
 	}
 
 	uint32_t* a11 = (uint32_t*)malloc(sizeof(uint32_t));
 	uint32_t* a22 = (uint32_t*)malloc(sizeof(uint32_t));
 	uint32_t* a33 = (uint32_t*)malloc(sizeof(uint32_t));
-	*a11 = 2;
+	*a11 = 180;
 	*a22 = 89;
 	*a33 = 100;
 	void* argss[] = { a11 };
@@ -55,7 +58,7 @@ void test1(Table& table) {
 	void* argsss[] = { a111 };
 
 	Query* query = new Query();
-	query->FindByComparator(&table, (char*)"c1", argss, 1, EQUALS | LESS);
+	query->FindByComparator(&table, (char*)"c1", argss, 1, EQUALS | BIGGER);
 	query->FindByComparator(&table, (char*)"c2", argsss, 1, EQUALS);
 	query->CompareQueries(AND);
 }
