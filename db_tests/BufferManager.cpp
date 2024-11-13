@@ -337,6 +337,8 @@ void BufferManager::SearchLevel1(Table* table, Column* column, void* values[], i
 					std::cout << "found match at offset " << *(int*)offset << std::endl;
 					foundValues.push_back(*(int*)offset);
 				}
+				free(value);
+				free(offset);
 			}
 			free(buffer);
 		}

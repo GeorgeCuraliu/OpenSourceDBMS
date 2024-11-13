@@ -55,9 +55,11 @@ public:
 
 		BTNode* temp = root;
 		while (temp) {
-			int comp = VoidMemoryHandler::COMPARE(value, temp->getValue(numberOfBytes), dataType);
+			void* val = temp->getValue(numberOfBytes);
+			int comp = VoidMemoryHandler::COMPARE(value, val, dataType);
+			free(val);
 			if (comp & (EQUALS | LESS)) {
-				std::cout << (int)temp->getOffset(numberOfBytes) << " left " << std::endl;
+				//std::cout << (int)temp->getOffset(numberOfBytes) << " left " << std::endl;
 				if (temp->left == nullptr) {
 					temp->left = newNode;
 					break;
@@ -65,7 +67,7 @@ public:
 				else temp = temp->left;
 			}
 			else {
-				std::cout << (int)temp->getOffset(numberOfBytes) << " right " << std::endl;
+				//std::cout << (int)temp->getOffset(numberOfBytes) << " right " << std::endl;
 				if (temp->right == nullptr) {
 					temp->right = newNode;
 					break;
@@ -84,7 +86,9 @@ public:
 
 		BTNode* temp = root;
 		while (temp) {
-			int comparationResult = VoidMemoryHandler::COMPARE(temp->getValue(numberOfBytes), value, dataType);
+			void* val = temp->getValue(numberOfBytes);
+			int comparationResult = VoidMemoryHandler::COMPARE(val, value, dataType);
+			free(val);
 			bool currentValue = false;
 
 			//just add the offset if it matches the equals comparator
@@ -138,7 +142,9 @@ public:
 		int size = numberOfBytes + 1;
 		auto addToBuffer = [&i, buffer, &size, bloomData, &bloomSize](BTNode* current) {
 			std::memcpy((char*)buffer + i * (size), current->value, size);
-			BloomFilter::AddValue(bloomData, current->getValue(size - 1), size - 1, bloomSize);//-1 for offset byte
+			void* val = current->getValue(size - 1);
+			BloomFilter::AddValue(bloomData, val, size - 1, bloomSize);//-1 for offset byte
+			free(val);
 			i++;
 			};
 		IterrateWithCallback(root, addToBuffer);
@@ -148,9 +154,9 @@ public:
 		if (root == nullptr) return;
 		if (current == nullptr) current = root;
 		if (current == nullptr) return;
-		if (current->left) FlushData(current->left);
+		if (current->left) FlushData(current->left);		
 		if (current->right) FlushData(current->right);
-		std::cout << "deleting " << *(int*)current->getValue(numberOfBytes) << std::endl;
+		//std::cout << "deleting " << *(int*)current->getValue(numberOfBytes) << std::endl;
 		if (current == root && current != nullptr) {
 			delete root;
 			root = nullptr;
