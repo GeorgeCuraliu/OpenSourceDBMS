@@ -30,4 +30,6 @@ public:
 	void DisplayColumns();
 	void DisplayAllRows();
 
+	~Table();
+
 };

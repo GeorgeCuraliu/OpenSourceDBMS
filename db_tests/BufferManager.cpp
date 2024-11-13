@@ -106,6 +106,8 @@ void BufferManager::StoreLevel1(Table* table) {
 	std::memcpy(v2, (char*)bufferT + 4, 4);
 
 	std::cout << "test values read " << numberOfBytesWritten << "  --v1 " << *(int*)v1 << "  --v2 " << *(int*)v2 << std::endl;
+	free(v1);
+	free(v2);
 
 
 	CloseHandle(fileHandle);
@@ -344,5 +346,6 @@ void BufferManager::SearchLevel1(Table* table, Column* column, void* values[], i
 		}
 	}
 	free(fileName);
+	free(bloomBuffer);
 	CloseHandle(fileHandle);
 }

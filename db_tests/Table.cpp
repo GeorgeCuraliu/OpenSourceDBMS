@@ -142,3 +142,8 @@ void Table::DisplayAllRows() {
 		DisplayRow(i);
 	}
 }
+
+Table::~Table() {
+	free(values);
+	free(freeMemory);
+}

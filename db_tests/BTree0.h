@@ -150,25 +150,17 @@ public:
 		IterrateWithCallback(root, addToBuffer);
 	}
 
-	void FlushData(BTNode* current = nullptr) {
-		if (root == nullptr) return;
-		if (current == nullptr) current = root;
+	void FlushData(BTNode* current) {
 		if (current == nullptr) return;
-		if (current->left) FlushData(current->left);		
-		if (current->right) FlushData(current->right);
-		//std::cout << "deleting " << *(int*)current->getValue(numberOfBytes) << std::endl;
-		if (current == root && current != nullptr) {
-			delete root;
-			root = nullptr;
-		}
-		else if(current == nullptr) {
-			delete current;
-		}
-		
-		//if (current == nullptr) return;
-		//FlushData(current->right);
-		//FlushData(current->left);
-		//delete current;
+
+		FlushData(current->left);
+		FlushData(current->right);
+
+		delete current;
 
 	}
+	void FlushData() {
+		FlushData(root);
+		root = nullptr;
+	};
 };
