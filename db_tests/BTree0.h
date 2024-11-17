@@ -98,7 +98,7 @@ public:
 				currentValue = true;
 			}
 			//iterate the entire subtree that matches the description
-			if (comparator & comparationResult) {
+			if (comparator & comparationResult && comparator != EQUALS) {
 				if (!currentValue)
 					foundValues.push_back((int)temp->getOffset(numberOfBytes));
 				if (comparator & LESS) {
@@ -110,6 +110,9 @@ public:
 					temp = temp->left;
 				}
 			}
+			else if (comparationResult & LESS) {
+				temp = temp->right;
+			}
 			else {
 				temp = temp->left;
 			}
@@ -117,6 +120,10 @@ public:
 			
 
 		}
+	}
+
+	void DeleteValues(std::vector<int>& offsets) {
+
 	}
 
 	void IterrateWithCallback(BTNode* current, std::function<void(BTNode*)> callBack) {

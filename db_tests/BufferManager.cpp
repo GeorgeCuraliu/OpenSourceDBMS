@@ -48,7 +48,7 @@ void BufferManager::StoreLevel1(Table* table) {
 	if (bucketsPerSegment > 128) bucketsPerSegment = 128;
 	int bufferSize = table->rowSize * bucketsPerSegment;
 	int wroteBuckets = 0;
-	int segmentPointer = BUFFER_SIZE * (table->L1_registers * ceil(128.f / (double)bucketsPerSegment)) + SEGMENT_SIZE;// SEGMENT_SIZE for the first segment wich is tomstones and bloom filter data
+	int segmentPointer = BUFFER_SIZE * (table->L1_registers * ceil(128.f / (double)bucketsPerSegment)) + SEGMENT_SIZE;// SEGMENT_SIZE for the first segment wich is tombstones and bloom filter data
 
 
 	if ((128 % bucketsPerSegment != 0  > 0 || bufferSize < 4096 ) && table->L1_registers) {
@@ -144,7 +144,7 @@ void BufferManager::StoreLevel1(Table* table) {
 		);
 		if (fileHandle == INVALID_HANDLE_VALUE) std::cout << "couldnt open the file " << fileName << " ERROR " << GetLastError() << std::endl;
 
-		//retrieve first bloom filtre, if it should exist
+		//retrieve first bloom filter, if it should exist
 		if (table->L1_registers != 0) {
 			DWORD readBytes;
 			SetFilePointer(fileHandle, 0, 0, NULL);

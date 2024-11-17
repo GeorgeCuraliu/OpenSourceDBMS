@@ -10,14 +10,11 @@
 #include "Query.h"
 #include "Parameters.h"
 
-//check memory leaks
-#define _CRTDBG_MAP_ALLOC
-#include <stdlib.h>
-#include <crtdbg.h>
 
 
 void test1(Table& table);
 void test2(Table& table);
+void test3(Table& table);
 
 int main(int argc, char* argv[]) {
 	char name1[] = "c1";
@@ -29,15 +26,7 @@ int main(int argc, char* argv[]) {
 	table.ConfirmDiagram();
 	table.DisplayColumns();
 
-	test1(table);
-
-	//_CrtSetReportMode(_CRT_WARN, _CRTDBG_MODE_FILE);
-	//_CrtSetReportFile(_CRT_WARN, _CRTDBG_FILE_STDOUT);
-	//_CrtSetReportMode(_CRT_ERROR, _CRTDBG_MODE_FILE);
-	//_CrtSetReportFile(_CRT_ERROR, _CRTDBG_FILE_STDOUT);
-	//_CrtSetReportMode(_CRT_ASSERT, _CRTDBG_MODE_FILE);
-	//_CrtSetReportFile(_CRT_ASSERT, _CRTDBG_FILE_STDOUT);
-	//_CrtDumpMemoryLeaks();
+	test3(table);
 
 	return 0;
 }
@@ -67,14 +56,14 @@ void test1(Table& table) {
 	uint32_t* a111 = (uint32_t*)malloc(sizeof(uint32_t));
 	uint32_t* a222 = (uint32_t*)malloc(sizeof(uint32_t));
 	uint32_t* a333 = (uint32_t*)malloc(sizeof(uint32_t));
-	*a111 = 1 * 200;
+	*a111 = 200 * 200;
 	*a222 = 89 * 200;
 	*a333 = 100 * 200;
 	void* argsss[] = { a111 };
 
-	Query* query = new Query();
-	query->FindByComparator(&table, (char*)"c1", argss, 1, EQUALS | BIGGER);
-	query->FindByComparator(&table, (char*)"c2", argsss, 1, EQUALS);
+	Query* query = new Query(&table);
+	query->FindByComparator((char*)"c1", argss, 1, EQUALS | BIGGER);
+	query->FindByComparator((char*)"c2", argsss, 1, EQUALS);
 	query->CompareQueries(AND);
 }
 
@@ -118,7 +107,36 @@ void test2(Table& table) {
 	int* a15 = (int*)malloc(4);
 	*a15 = 20;
 	void* argssq[] = { a15};
-	Query* query = new Query();
-	query->FindByComparator(&table, (char*)"c1", argssq, 1, EQUALS | LESS);
+	Query* query = new Query(&table);
+	query->FindByComparator((char*)"c1", argssq, 1, EQUALS | LESS);
+
+}
+
+void test3(Table& table) {
+	int* a1 = (int*)malloc(4);
+	int* a2 = (int*)malloc(4);
+	*a1 = 2;
+	*a2 = 3;
+	void* vals[] = {a1, a2};
+	table.AddRow(vals);
+
+	int* a11 = (int*)malloc(4);
+	int* a22 = (int*)malloc(4);
+	*a11 = 3;
+	*a22 = 6;
+	void* valss[] = { a11, a22 };
+	table.AddRow(valss);
+	table.DisplayAllRows();
+
+	Query* nq = new Query(&table);
+	nq->FindByComparator((char*)"c2", vals, 2, EQUALS)->Delete();
+
+	int* a111 = (int*)malloc(4);
+	int* a222 = (int*)malloc(4);
+	*a111 = 3;
+	*a222 = 6;
+	void* valsss[] = { a111, a222 };
+	table.AddRow(valsss);
+	table.DisplayAllRows();
 
 }

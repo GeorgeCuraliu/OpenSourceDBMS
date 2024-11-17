@@ -27,6 +27,7 @@ class Query {
 private:
 
 	LinkedList<QueryData> *querriesResults;
+	Table* table;
 
 	void OperationOR(std::vector<int>& a, std::vector<int>& b) {
 		for (int num : a) std::cout << num << " ";
@@ -70,11 +71,11 @@ private:
 	}
 
 public:
-	Query():querriesResults(new LinkedList<QueryData>()){}
+	Query(Table* table):querriesResults(new LinkedList<QueryData>()), table(table){}
 
 	//comparator -> LESS, EQUALS, BIGGER, NOT
-	Query* FindByComparator(Table* table, char* columnName, void* values[], int argumentsNumber, int comparator) {
-		auto columnParser = [this ,columnName, table, &argumentsNumber, values, comparator](Column* currentColumn) {
+	Query* FindByComparator(char* columnName, void* values[], int argumentsNumber, int comparator) {
+		auto columnParser = [this ,columnName, &argumentsNumber, values, comparator](Column* currentColumn) {
 			if (strcmp(currentColumn->name, columnName) == 0) {
 				QueryData* foundData = new QueryData();
 
@@ -111,7 +112,9 @@ public:
 				OperationAND(currentData->L0_results, cursor->L0_results);
 				OperationAND(currentData->L1_results, cursor->L1_results);
 				OperationAND(currentData->L2_results, cursor->L2_results);
+				QueryData* oldCursor = cursor;
 				cursor = cursor->next;
+				delete oldCursor;
 			}
 		}
 		else if (operation == OR) {
@@ -120,9 +123,22 @@ public:
 				OperationOR(currentData->L0_results, cursor->L0_results);
 				OperationOR(currentData->L1_results, cursor->L1_results);
 				OperationOR(currentData->L2_results, cursor->L2_results);
+				QueryData* oldCursor = cursor;
 				cursor = cursor->next;
+				delete oldCursor;
 			}
 		}
+		currentData->next = nullptr;//all QueryData object were merged into this one, therefore there is no next QueryData
+		return this;
+	}
+	Query* Delete() {
+
+		auto deleteFromL0 = [this](Column* column) {
+			column->data->DeleteValues(querriesResults->head->L0_results);
+			};
+		table->columns.IterateWithCallback(deleteFromL0);
+		table->DeleteRow(querriesResults->head->L0_results);
+
 		return this;
 	}
 

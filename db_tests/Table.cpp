@@ -89,8 +89,21 @@ void Table::AddRow(void* newData[]) {
 	}
 }
 
+
+void Table::DeleteRow(std::vector<int>& offsets){
+	for (auto it = offsets.begin(); it != offsets.end(); ) {
+		for (int i = 0; i < rowSize; i++) {
+			((char*)values)[*it * rowSize + i] = 0;//set every byte of the row to 0
+		}
+		BitwiseHandler::clearBit(freeMemory, *it);
+		std::cout << *it << " offset from table values cleared" << std::endl;
+		it++;
+	}
+}
+
+
 void Table::FlushData() {
-	if (L1_registers < 5) {
+	if (L1_registers <= 1) {
 		BufferManager::StoreLevel1(this);
 		L1_registers++;
 	}

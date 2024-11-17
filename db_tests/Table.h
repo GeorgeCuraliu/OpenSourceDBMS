@@ -25,6 +25,7 @@ public:
 	//will allocate memory for the values pointer after the diagram was loaded and check the size of a row
 	void ConfirmDiagram();
 	void AddRow(void* newData[]);
+	void DeleteRow(std::vector<int>& offsets);
 	void FlushData();
 	void DisplayRow(int offset);
 	void DisplayColumns();
