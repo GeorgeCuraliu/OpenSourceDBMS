@@ -126,11 +126,28 @@ void test3(Table& table) {
 	*a22 = 6;
 	void* valss[] = { a11, a22 };
 	table.AddRow(valss);
+
+	int* a118 = (int*)malloc(4);
+	int* a228 = (int*)malloc(4);
+	*a118 = 2;
+	*a228 = 1;
+	void* valss8[] = { a118, a228 };
+	table.AddRow(valss8);
 	table.DisplayAllRows();
 
 	Query* nq = new Query(&table);
-	nq->FindByComparator((char*)"c2", vals, 2, EQUALS)->Delete();
+	nq->FindByComparator((char*)"c1", vals, 2, EQUALS)->Delete();
+	auto showTrees = [](Column* column) {
+		auto display = [column](BTNode* node) {
+			std::cout << *(int*)node->getValue(column->data->numberOfBytes);
+			};
+		std::cout << "" << std::endl;
+		column->data->IterrateWithCallback(column->data->root, display);
+		};
+	table.columns.IterateWithCallback(showTrees);
+	table.DisplayAllRows();
 
+	return;
 	int* a111 = (int*)malloc(4);
 	int* a222 = (int*)malloc(4);
 	*a111 = 3;

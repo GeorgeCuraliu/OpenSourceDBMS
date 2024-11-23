@@ -349,3 +349,62 @@ void BufferManager::SearchLevel1(Table* table, Column* column, void* values[], i
 	free(bloomBuffer);
 	CloseHandle(fileHandle);
 }
+
+void BufferManager::DeleteValuesLevel1(Table* table, std::vector<int>& deleteValues){
+	auto deleteFromRegistry = [table, &deleteValues](Column* column) {
+
+		size_t tableNameLen = std::strlen(table->name);
+		size_t columnNameLen = std::strlen(column->name);
+		char* fileName = (char*)calloc(tableNameLen + columnNameLen + 2, sizeof(char)); // +1 for null terminator
+		if (!fileName) {
+			std::cerr << "Memory allocation failed!" << std::endl;
+			return;  // Handle allocation failure
+		}
+		std::memcpy(fileName, table->name, tableNameLen);
+		fileName[tableNameLen] = '&';
+		std::memcpy(fileName + tableNameLen + 1, column->name, columnNameLen);
+		fileName[tableNameLen + columnNameLen + 1] = '\0';
+
+		HANDLE fileHandle = nullptr;
+		fileHandle = CreateFileA(
+			(LPCSTR)fileName,
+			GENERIC_ALL,
+			FILE_SHARE_READ,
+			NULL,
+			OPEN_ALWAYS,
+			FILE_ATTRIBUTE_NORMAL,
+			NULL
+		);
+		SetFilePointer(fileHandle, 0, 0, NULL);
+
+		void* tombstones = calloc(16, 1);
+		DWORD readBytes = 0;
+		ReadFile(
+			fileHandle,
+			tombstones,
+			16,
+			&readBytes,
+			NULL
+		);
+		std::cout << "read " << readBytes << "out of 16 from " << fileName << std::endl;
+
+		std::cout << "set tombstones to 0 at ";
+		for (auto it = deleteValues.begin(); it != deleteValues.end(); ) {
+			std::cout << *it << " ";
+			BitwiseHandler::clearBit((uint8_t*)tombstones, *it);
+			it = deleteValues.erase(it);
+		}
+		std::cout << "" << std::endl;
+
+		readBytes = 0;
+		WriteFile(
+			fileHandle,
+			tombstones,
+			16,
+			&readBytes,
+			NULL
+		);
+
+		};
+	table->columns.IterateWithCallback(deleteFromRegistry);
+}

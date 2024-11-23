@@ -123,7 +123,119 @@ public:
 	}
 
 	void DeleteValues(std::vector<int>& offsets) {
+		std::vector<BTNode*>* toDelete = new std::vector<BTNode*>;
 
+		auto checkOffsets = [offsets, this, toDelete](BTNode* current) {
+			for (auto it = offsets.begin(); it != offsets.end(); it++) {
+				if (*it == current->getOffset(numberOfBytes)) {
+					toDelete->push_back(current);
+
+				}
+			}
+			};
+		IterrateWithCallback(root, checkOffsets);
+
+		for (auto it = toDelete->begin(); it != toDelete->end(); ) {
+			BTNode* pointer = root;
+			BTNode* current = *it;
+			BTNode* prev = root;
+			void* currValue = current->getValue(numberOfBytes);
+			bool flag = true;
+			while (flag && pointer != nullptr) {
+				void* tempValue = pointer->getValue(numberOfBytes);
+				int res = VoidMemoryHandler::COMPARE(currValue, tempValue, dataType);
+				if (res == LESS) {
+					prev = pointer;
+					pointer = pointer->left;
+				}
+				else if (res == BIGGER) {
+					prev = pointer;
+					pointer = pointer->right;
+				}
+				else if(res == EQUALS && pointer->getOffset(numberOfBytes) == current->getOffset(numberOfBytes)){
+					flag = false;
+					it = toDelete->erase(it);
+					std::cout << "deleting node " << (int)current->getOffset(numberOfBytes) << std::endl;
+					if (pointer->right == nullptr && pointer->left == nullptr) {//no subtrees case
+						if (root == pointer) {
+							free(root);
+							root = nullptr;
+						}
+						else if (prev->left == pointer) {
+							free(prev->left);
+							prev->left = nullptr;
+						}
+						else {
+							free(prev->right);
+							prev->right = nullptr;
+						} 
+						
+					}
+					else if (root == pointer) {
+						if (root->right) {
+							//select the left subtree of the right node
+							BTNode* leftValue = root->right->left;
+
+							//find biggest value in left subtree
+							if (root->left) {
+								BTNode* biggestValue = nullptr;
+								biggestValue = root->left;
+								while (biggestValue->right)
+									biggestValue = biggestValue->right;
+								biggestValue->right = leftValue;
+							}
+
+							root->right->left = root->left;
+							root = root->right;
+							free(pointer);
+
+						}
+						else {
+							root = root->left;
+						}
+							
+					}
+					else {
+						if (pointer->right != nullptr) {
+							BTNode* leftValue = pointer->right->left;//et the left sub tree of the right value
+							pointer->right->left = pointer->left;
+							if (prev->left == pointer) 
+								prev->left = pointer->right;
+							else 
+								prev->right = pointer->right;
+
+							//find the biggest value in the left subtree to move the leftValue left subtree to it
+							if (pointer->left) {
+								BTNode* biggestValue = pointer->left;
+								while (biggestValue->right)
+									biggestValue = biggestValue->right;
+								biggestValue->right = leftValue->left;
+								leftValue->left = nullptr;
+							}
+
+
+							free(pointer);
+						}
+						else {
+							if (prev->left == pointer)
+								prev->left = pointer->left;
+							else
+								prev->right = pointer->left;
+							free(pointer);
+						}
+					}
+				}
+				//if the values are the same but the offset not
+				else {
+					prev = pointer;
+					pointer = pointer->left;
+				}
+
+				free(tempValue);
+			}
+			if (flag)it++;//the last pointer was null, therefore couldnt find the searched value
+			free(currValue);
+		}
 	}
 
 	void IterrateWithCallback(BTNode* current, std::function<void(BTNode*)> callBack) {
@@ -171,3 +283,4 @@ public:
 		root = nullptr;
 	};
 };
+;;;
