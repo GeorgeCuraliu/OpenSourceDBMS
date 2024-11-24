@@ -15,6 +15,7 @@
 void test1(Table& table);
 void test2(Table& table);
 void test3(Table& table);
+void test4(Table& table);
 
 int main(int argc, char* argv[]) {
 	char name1[] = "c1";
@@ -26,7 +27,7 @@ int main(int argc, char* argv[]) {
 	table.ConfirmDiagram();
 	table.DisplayColumns();
 
-	test3(table);
+	test4(table);
 
 	return 0;
 }
@@ -48,7 +49,7 @@ void test1(Table& table) {
 	uint32_t* a11 = (uint32_t*)malloc(sizeof(uint32_t));
 	uint32_t* a22 = (uint32_t*)malloc(sizeof(uint32_t));
 	uint32_t* a33 = (uint32_t*)malloc(sizeof(uint32_t));
-	*a11 = 180;
+	*a11 = 190;
 	*a22 = 89;
 	*a33 = 100;
 	void* argss[] = { a11 };
@@ -156,4 +157,42 @@ void test3(Table& table) {
 	table.AddRow(valsss);
 	table.DisplayAllRows();
 
+}
+
+void test4(Table& table) {
+	for (int i = 0; i < 2 * 128 + 17; i++) {
+		int* a1 = (int*)malloc(4);
+		int* a2 = (int*)malloc(4);
+		*a1 = i;
+		*a2 = (i * 200);
+		void* argss[] = { a1, a2 };
+		std::cout << "adding " << *(int*)a1 << " " << *(int*)a2 << std::endl;
+		table.AddRow(argss);
+		free(a1);
+		free(a2);
+		//free(argss);
+	}
+
+	uint32_t* a11 = (uint32_t*)malloc(sizeof(uint32_t));
+	uint32_t* a22 = (uint32_t*)malloc(sizeof(uint32_t));
+	uint32_t* a33 = (uint32_t*)malloc(sizeof(uint32_t));
+	*a11 = 220;
+	*a22 = 89;
+	*a33 = 100;
+	void* argss[] = { a11 };
+
+	uint32_t* a111 = (uint32_t*)malloc(sizeof(uint32_t));
+	uint32_t* a222 = (uint32_t*)malloc(sizeof(uint32_t));
+	uint32_t* a333 = (uint32_t*)malloc(sizeof(uint32_t));
+	*a111 = 238 * 200;
+	*a222 = 89 * 200;
+	*a333 = 100 * 200;
+	void* argsss[] = { a111 };
+
+	Query* query = new Query(&table);
+	query->FindByComparator((char*)"c1", argss, 1, EQUALS | BIGGER);
+	query->Delete();
+	query->FindByComparator((char*)"c2", argsss, 1, EQUALS);
+
+	table.DisplayAllRows();
 }

@@ -4,6 +4,8 @@ constexpr int SHORT_INT_SIZE = 4;
 constexpr int SEGMENT_SIZE = 512;
 constexpr int BUFFER_SIZE = 4096;
 
+constexpr int BLOOM_FILTER_SIZE = SEGMENT_SIZE - 32;
+
 //comparators
 constexpr int EQUALS = 0x1;
 constexpr int LESS = 0x2;

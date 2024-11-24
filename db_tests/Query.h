@@ -131,6 +131,7 @@ public:
 		currentData->next = nullptr;//all QueryData object were merged into this one, therefore there is no next QueryData
 		return this;
 	}
+	//Delete() assumes that querriesResult has just one querryResult
 	Query* Delete() {
 
 		auto deleteFromL0 = [this](Column* column) {
@@ -138,7 +139,10 @@ public:
 			};
 		table->columns.IterateWithCallback(deleteFromL0);
 		table->DeleteRow(querriesResults->head->L0_results);
+		BufferManager::DeleteValuesLevel1(table, querriesResults->head->L1_results);
 
+		querriesResults->DeleteNode(querriesResults->head);
+		
 		return this;
 	}
 

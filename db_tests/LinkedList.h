@@ -36,6 +36,7 @@ public:
 			t* oldhead = head;
 			head = head->next;
 			delete oldhead;
+			if (!head)return;
 		}
 		t* temp = head;
 		while (temp->next != node)

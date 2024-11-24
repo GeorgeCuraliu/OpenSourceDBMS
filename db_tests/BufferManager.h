@@ -9,6 +9,8 @@ class Table;
 class Column;
 
 class BufferManager {
+private:
+	static void ClearTombstones(char* fileName, std::vector<int>& deleteValues, int offset);
 public:
 	static void StoreLevel1(Table* table);
 	static void SearchLevel1(Table* table, Column* column, void* values[], int argumentsNumber, std::vector<int>& foundValues, int comparator);
