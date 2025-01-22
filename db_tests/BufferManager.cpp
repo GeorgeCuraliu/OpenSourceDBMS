@@ -5,6 +5,7 @@
 #include "Table.h"
 #include "BitwiseHandler.h"
 #include "Parameters.h"
+#include "FileData.h"
 
 void BufferManager::StoreLevel1(Table* table) {
 
@@ -41,57 +42,45 @@ void BufferManager::StoreLevel1(Table* table) {
 	);
 	std::cout << "wrote " << (int)numberOfBytesWritten << " bytes of tombstones out of 16" << std::endl;
 
+	FileData* fileData = new FileData(table->rowSize, table->L1_registers, SEGMENT_SIZE);
 
-	//write the actual data
-	int totalBucketsPerSegment = floor(BUFFER_SIZE / double(table->rowSize));
-	int bucketsPerSegment = floor(BUFFER_SIZE / double(table->rowSize));
-	if (bucketsPerSegment > 128) bucketsPerSegment = 128;
-	int bufferSize = table->rowSize * bucketsPerSegment;
-	int wroteBuckets = 0;
-	int segmentPointer = BUFFER_SIZE * (table->L1_registers * ceil(128.f / (double)bucketsPerSegment)) + SEGMENT_SIZE;// SEGMENT_SIZE for the first segment wich is tombstones and bloom filter data
+	//is the last disk segment has free memory left, this if will fill it
+	//first buffer to write that will continue the last one
+	//will be used just if is the second L1_register flush of this table
+	if ((128 % fileData->valuesPerSegment != 0 || fileData->bufferSize < 4096 ) && table->L1_registers) {
 
-
-	if ((128 % bucketsPerSegment != 0  > 0 || bufferSize < 4096 ) && table->L1_registers) {
-		int segment = 128 / bucketsPerSegment;
-		int writtenValues;
-		if (bucketsPerSegment == 128) writtenValues = bucketsPerSegment;
-		else writtenValues = 128 % bucketsPerSegment;
-		int offset = BUFFER_SIZE * (segment - 1) + writtenValues * table->rowSize + SEGMENT_SIZE;//-1 for the first segment, wich is metadata
-		int valuesToWrite = totalBucketsPerSegment - writtenValues;
-		if (valuesToWrite > 128) valuesToWrite = 128;
+		int offset = 0;
+		fileData->fillEmptySpace(offset);
 		SetFilePointer(fileHandle, offset, 0, NULL);
 		WriteFile(
 			fileHandle,
 			table->values,
-			valuesToWrite * table->rowSize,
+			fileData->valuesToWrite * table->rowSize,
 			&numberOfBytesWritten,
 			NULL
 		);
-		wroteBuckets += valuesToWrite;
-		std::cout << "wrote " << writtenValues << " values in the segment with free memory -- table -- " << std::endl;
+		
+		std::cout << "wrote " << (int)numberOfBytesWritten / fileData->valueSize << " values in the segment with free memory -- table -- " << std::endl;
 	}
 
-	while (wroteBuckets < 128) {
-		SetFilePointer(fileHandle, segmentPointer, NULL, 0);
-		void* buffer = malloc(bufferSize);
-		if (!buffer) return;
-		std::memcpy(buffer, (uint8_t*)table->values + wroteBuckets * table->rowSize, bufferSize);
+	while (fileData->wroteValues < 128) {
+		SetFilePointer(fileHandle, fileData->segmentPointer, NULL, 0);
 		WriteFile(
 			fileHandle,
-			buffer,
-			bufferSize,
+			(uint8_t*)table->values + fileData->wroteValues * table->rowSize,
+			fileData->bufferSize,
 			&numberOfBytesWritten,
 			NULL
 		);
-		wroteBuckets += bucketsPerSegment;
-		std::cout << "wrote " << (int)numberOfBytesWritten << " bytes out of " << bufferSize << " -- total buckets wrote " << wroteBuckets << " -- segment pointer " << segmentPointer << " (" << segmentPointer / BUFFER_SIZE << ")" << std::endl;
-		segmentPointer += BUFFER_SIZE;
-		free(buffer);
+		(*fileData)++;
+		std::cout << "wrote " << (int)numberOfBytesWritten << " bytes out of " << fileData->bufferSize << " -- total buckets wrote " << fileData->wroteValues << " -- segment pointer " << fileData->segmentPointer << " (" << fileData->segmentPointer / BUFFER_SIZE << ")" << std::endl;
 	}
+
+
 
 
 	void* bufferT = calloc(8, 1);
-	SetFilePointer(fileHandle, 512 * 1 + 8 * 4, 0, NULL);
+	SetFilePointer(fileHandle, 512 * 1 + 8 * 100, 0, NULL);
 	bool res = ReadFile(
 		fileHandle,
 		bufferT,
@@ -114,9 +103,13 @@ void BufferManager::StoreLevel1(Table* table) {
 	free(fileName);
 	free(bufferT);
 
+
+
 	auto storeColumns = [table](Column* column) {
-		void* dataToStore = malloc((column->data->numberOfBytes + 1) * 128);
-		void* bloomFilter = calloc(BLOOM_FILTER_SIZE, 1);
+		void* dataToStore = malloc((column->data->numberOfBytes) * 128);
+		//void* bloomFilter = calloc(BLOOM_FILTER_SIZE, 1);
+		//void* offsets = malloc(128);
+		void* metadata = calloc(L1_METADATA, 1);
 		if (!dataToStore) std::cout << "could not allocate memory for dataToStore" << std::endl;
 
 		size_t tableNameLen = std::strlen(table->name);
@@ -143,14 +136,14 @@ void BufferManager::StoreLevel1(Table* table) {
 		);
 		if (fileHandle == INVALID_HANDLE_VALUE) std::cout << "couldnt open the file " << fileName << " ERROR " << GetLastError() << std::endl;
 
-		//retrieve first bloom filter, if it should exist
+		//retrieve first the metadata, if it should exist
 		if (table->L1_registers != 0) {
 			DWORD readBytes;
 			SetFilePointer(fileHandle, 0, 0, NULL);
 			bool res = ReadFile(
 				fileHandle,
-				bloomFilter,
-				BLOOM_FILTER_SIZE,
+				metadata,
+				L1_METADATA,
 				&readBytes,
 				NULL
 			);
@@ -158,117 +151,100 @@ void BufferManager::StoreLevel1(Table* table) {
 
 		}
 
-		column->data->GetAllValuesWithBloom(dataToStore, bloomFilter, BLOOM_FILTER_SIZE);
+		column->data->GetAllValuesWithBloom(dataToStore, metadata, BLOOM_FILTER_SIZE, (char*)metadata + BLOOM_FILTER_SIZE + 32 + 128 * table->L1_registers);
 
 
 		//write the bloom filter data
 		DWORD numberOfBytesWritten = 0;
-		SetFilePointer(fileHandle, 0, 0, NULL);
-		WriteFile(
-			fileHandle,
-			bloomFilter,
-			BLOOM_FILTER_SIZE,
-			&numberOfBytesWritten,
-			NULL
-		);
-		std::cout << "wrote " << numberOfBytesWritten << " bytes of bloom filter data out of " << BLOOM_FILTER_SIZE << std::endl;
+		//SetFilePointer(fileHandle, 0, 0, NULL);
+		//WriteFile(
+		//	fileHandle,
+		//	bloomFilter,
+		//	BLOOM_FILTER_SIZE,
+		//	&numberOfBytesWritten,
+		//	NULL
+		//);
+		//std::cout << "wrote " << numberOfBytesWritten << " bytes of bloom filter data out of " << BLOOM_FILTER_SIZE << std::endl;
 
-		//write the tombstones
-		void* tombstones = calloc(32, 1);
-		for (int i = 0; i < 32; i++)
-			((uint8_t*)tombstones)[i] = 255;
-		SetFilePointer(fileHandle, BLOOM_FILTER_SIZE, 0, NULL);
+
+
+
+		//void* tombstones = calloc(16, 1);
+		for (int i = 512 + table->L1_registers * 16; i < table->L1_registers * 16 + 16; i++)
+			((uint8_t*)metadata)[i] = 255;
+		SetFilePointer(fileHandle, BLOOM_FILTER_SIZE + table->L1_registers * 16, 0, NULL);
 		WriteFile(
 			fileHandle,
-			tombstones,
-			32,
+			metadata,
+			L1_METADATA,
 			&numberOfBytesWritten,
 			NULL
 		);
 		
-		int totalValuesPerSegment = floor(BUFFER_SIZE / double(column->data->numberOfBytes + 1));
-		int valuesPerSegment;
-		if (totalValuesPerSegment > 128) valuesPerSegment = 128;
-		else valuesPerSegment = totalValuesPerSegment;
-		int bufferSize = (column->data->numberOfBytes + 1) * valuesPerSegment;
-		int wroteValues = 0;
-		int segmentPointer = BUFFER_SIZE * (table->L1_registers * ceil(128.f / (double)valuesPerSegment)) + SEGMENT_SIZE;//the next unused disk fragment
+		FileData* fileData = new FileData(column->data->numberOfBytes, table->L1_registers, SEGMENT_SIZE * 2);
 
 		//is the last disk segment has free memory left, this if will fill it
 		//first buffer to write that will continue the last one
 		//will be used just if is the second L1_register flush of this table
-		if ((128 % valuesPerSegment != 0 || totalValuesPerSegment > 128) && table->L1_registers > 0) {
-			int segment = 128 / valuesPerSegment;
-			int writtenValues;
-			if (valuesPerSegment == 128) writtenValues = valuesPerSegment;
-			else writtenValues = 128 % valuesPerSegment;
-			int offset = BUFFER_SIZE * (segment - 1) + writtenValues * (column->data->numberOfBytes + 1) + SEGMENT_SIZE;
-			int valuesToWrite = totalValuesPerSegment - writtenValues;
-			if (valuesToWrite > 128) valuesToWrite = 128;
+		if ((128 % fileData->valuesPerSegment != 0 || fileData->totalValuesPerSegment > 128) && table->L1_registers > 0) {
+			int offset = 0;
+			fileData->fillEmptySpace(offset);
 			SetFilePointer(fileHandle, offset, 0, NULL);
 			WriteFile(
 				fileHandle,
 				dataToStore,
-				valuesToWrite * (column->data->numberOfBytes + 1),
+				fileData->valuesToWrite * (column->data->numberOfBytes),
 				&numberOfBytesWritten,
 				NULL
 			);
-			wroteValues += valuesToWrite;
-			std::cout << "wrote " << writtenValues << " values in the segment with free memory" << std::endl;
+			std::cout << "wrote " << fileData->wroteValues << " values in the segment with free memory" << std::endl;
 		}
 
-		while (wroteValues < 128) {
-			SetFilePointer(fileHandle, segmentPointer, NULL, 0);
-			static int valuesToWrite;
-			if (wroteValues + valuesPerSegment <= 128) {
-				valuesToWrite = valuesPerSegment;
-			}
-			else {//the case for remainig values of a buffer
-				valuesToWrite = 128 - wroteValues;
-			}
+		while (fileData->wroteValues < 128) {
+			SetFilePointer(fileHandle, fileData->segmentPointer, NULL, 0);
 			bool res = WriteFile(
 				fileHandle,
-				(void*)((uint8_t*)dataToStore + wroteValues * (column->data->numberOfBytes + 1)),
-				valuesToWrite * (column->data->numberOfBytes + 1),
+				(void*)((uint8_t*)dataToStore + fileData->wroteValues * fileData->valueSize),
+				fileData->bufferSize,
 				&numberOfBytesWritten,
 				NULL
 			);
 			if (!res) std::cout << "could not write the buffer for file " << fileName << " ERROR " << GetLastError() << std::endl;
-			wroteValues += valuesToWrite;
-			std::cout << "column " << column->name << " wrote " << (int)numberOfBytesWritten << " bytes out of " << bufferSize << " -- total buckets wrote " << wroteValues << " -- segment pointer " << segmentPointer << " (" << segmentPointer / BUFFER_SIZE << ")" << std::endl;
-			segmentPointer += BUFFER_SIZE;
+			(*fileData)++;
+			std::cout << "column " << column->name << " wrote " << (int)numberOfBytesWritten << " bytes out of " << fileData->bufferSize << " -- total buckets wrote " << fileData->wroteValues << " -- segment pointer " << fileData->segmentPointer << " (" << fileData->segmentPointer / BUFFER_SIZE << ")" << std::endl;
 		}
 
-		void* bufferT = calloc(5, 1);
+		void* bufferT = calloc(4, 1);
 		if (!bufferT) std::cout << "could not allocate memory for bufferT" << std::endl;
-		SetFilePointer(fileHandle, 512 * 1 + 5 * 100, 0 , NULL);
+		SetFilePointer(fileHandle, 512 * 2 + 4 * 100, 0 , NULL);
 		bool res = ReadFile(
 			fileHandle,
 			bufferT,
-			5,
+			4,
 			&numberOfBytesWritten,
 			NULL
 		);
 		if (!res) std::cout << "test failed " << GetLastError() << std::endl;
-		void* offset = calloc(4, 1);
+		//void* offset = calloc(4, 1);
 		void* value = malloc(4);
-		std::memcpy(offset, (char*)bufferT + 4, 1);
+		//std::memcpy(offset, (char*)bufferT + 4, 1);
 		std::memcpy(value, (char*)bufferT, 4);
 
-		std::cout << "test values read " << numberOfBytesWritten << "  --offset " << *(int*)offset << "  --value " << *(int*)value << std::endl;
+		std::cout << "test values read " << (int)numberOfBytesWritten << "  --offset " << "  --value " << *(int*)value << std::endl;
 
 		CloseHandle(fileHandle);
 
-		free(bloomFilter);
+		//free(bloomFilter);
 		free(dataToStore);
 		free(fileName);
 		free(bufferT);
-		free(offset);
+		//free(offset);
 		free(value);
-		free(tombstones);
+		free(metadata);
+		//free(tombstones);
 	};
 	table->columns.IterateWithCallback(storeColumns);
-
+	delete fileData;
 }
 
 
@@ -278,8 +254,8 @@ void BufferManager::SearchLevel1(Table* table, Column* column, void* values[], i
 	
 	size_t tableNameLen = std::strlen(table->name);
 	size_t columnNameLen = std::strlen(column->name);
-	void* tombstones = calloc(32, 1);
-	void* bloomBuffer = calloc(BLOOM_FILTER_SIZE, 1);
+	//void* tombstones = calloc(32, 1);
+	void* metadata = malloc(L1_METADATA);
 	char* fileName = (char*)calloc(tableNameLen + columnNameLen + 2, sizeof(char)); // +1 for null terminator
 	if (!fileName) {
 		std::cerr << "Memory allocation failed!" << std::endl;
@@ -306,45 +282,49 @@ void BufferManager::SearchLevel1(Table* table, Column* column, void* values[], i
 
 	DWORD readBytes;
 
-	SetFilePointer(fileHandle, BLOOM_FILTER_SIZE, 0, NULL);
-	bool res = ReadFile(
-		fileHandle,
-		tombstones,
-		32,
-		&readBytes,
-		NULL
-	);
+	//SetFilePointer(fileHandle, BLOOM_FILTER_SIZE, 0, NULL);
+	bool res; //= ReadFile(
+	//	fileHandle,
+	//	(char*)metadata + BLOOM_FILTER_SIZE,
+	//	32,
+	//	&readBytes,
+	//	NULL
+	//);
 
-	if (!res)std::cout << "coulnt read tombstones --read " << readBytes << " -- " << GetLastError() << std::endl;
+	//if (!res)std::cout << "coulnt read tombstones -- read " << readBytes << " -- " << GetLastError() << std::endl;
 
 	SetFilePointer(fileHandle, 0, 0, NULL);
 	res = ReadFile(
 		fileHandle,
-		bloomBuffer,
-		BLOOM_FILTER_SIZE,
+		metadata,
+		L1_METADATA,
 		&readBytes,
 		NULL
 	);
 
-	std::cout << "read " << readBytes << " bytes of bloom filter out of " << BLOOM_FILTER_SIZE << std::endl;
+	std::cout << "read " << readBytes << " bytes of metadata out of " << BLOOM_FILTER_SIZE << std::endl;
 
 	for (int i = 0; i < argumentsNumber; i++) {
-		bool result = BloomFilter::CheckValue(bloomBuffer, values[i], column->data->numberOfBytes, BLOOM_FILTER_SIZE);
+		bool result = BloomFilter::CheckValue(metadata, values[i], column->data->numberOfBytes, BLOOM_FILTER_SIZE);
 		if (result) std::cout << "value could be in L1 registers" << std::endl;
 		else std::cout << "value not there" << std::endl;
 
 		if (result || (comparator & (BIGGER | LESS | NOT))) {
 
+
+			///////////////////////////////////////
+			//WILL FAIL IN CASE REGISTER SIZE IS BIGGER THAN BUFFER_SIZE!!!!!!!!!!
+			///////////////////////////////////////
 			int bufferSize;
-			if ((column->data->numberOfBytes + 1) * 128 * table->L1_registers < BUFFER_SIZE)
-				bufferSize = (column->data->numberOfBytes + 1) * 128 * table->L1_registers;
+			if ((column->data->numberOfBytes) * 128 * table->L1_registers < BUFFER_SIZE)
+				bufferSize = (column->data->numberOfBytes) * 128 * table->L1_registers;
 			else
 				bufferSize = BUFFER_SIZE;
 
 			void* buffer = calloc(bufferSize, 1);
 			DWORD numberOfBytesRead;
 
-			SetFilePointer(fileHandle, SEGMENT_SIZE, 0, 0);
+			SetFilePointer(fileHandle, SEGMENT_SIZE * 2, 0, 0);
 			res = ReadFile(
 				fileHandle,
 				buffer,
@@ -354,27 +334,27 @@ void BufferManager::SearchLevel1(Table* table, Column* column, void* values[], i
 				);
 
 			for (int j = 0; j < 128 * table->L1_registers; j++) {
-				void* value = malloc(column->data->numberOfBytes);
-				void* offset = calloc(4, 1);
-				if (!value || !offset || !buffer) return;
-				std::memcpy(value, (uint8_t*)buffer + j * (column->data->numberOfBytes + 1), column->data->numberOfBytes);
-				std::memcpy(offset, (uint8_t*)buffer + j * (column->data->numberOfBytes + 1) + column->data->numberOfBytes, 1);
+				//void* value = malloc(column->data->numberOfBytes);
+				//void* offset = calloc(4, 1);
+				if (!buffer) return;
+				//std::memcpy(value, (uint8_t*)buffer + j * (column->data->numberOfBytes), column->data->numberOfBytes);
+				//std::memcpy(offset, (uint8_t*)buffer + j * (column->data->numberOfBytes) + column->data->numberOfBytes, 1);
 
-				int comp = VoidMemoryHandler::COMPARE(value, values[i], column->data->dataType);
-				if (comp & comparator && BitwiseHandler::checkBit((uint8_t*)tombstones, *(int*)offset)) {
-					std::cout << "found match at offset " << *(int*)offset << std::endl;
-					foundValues.push_back(*(int*)offset);
+				int comp = VoidMemoryHandler::COMPARE((uint8_t*)buffer + j, values[i], column->data->dataType);
+				if (comp & comparator && BitwiseHandler::checkBit((uint8_t*)metadata, *(int*)((char*)metadata)[512 + 32 + j])) {
+					std::cout << "found match at offset " << *(int*)((char*)metadata)[512 + 32 + j] << " " << j << std::endl;
+					foundValues.push_back(*(int*)((char*)metadata)[512 + 32 + j]);
 				}
-				free(value);
-				free(offset);
+				//free(value);
+				//free(offset);
 			}
 			free(buffer);
 		}
 	}
 	free(fileName);
-	free(bloomBuffer);
+	free(metadata);
 	CloseHandle(fileHandle);
-	free(tombstones);
+	//free(tombstones);
 }
 
 void BufferManager::DeleteValuesLevel1(Table* table, std::vector<int>& deleteValues){

@@ -246,23 +246,32 @@ public:
 		IterrateWithCallback(current->right, callBack);
 	}
 
-	void GetAllValues(void* buffer) {
+	//offsetsBuffer is a optional paramater, but without it just the values would be exported
+	void GetAllValues(void* buffer, void* offsetsBuffer = 0) {
 		int i = 0;
-		int size = numberOfBytes + 1;
-		auto addToBuffer = [&i, buffer, &size](BTNode* current) {
-			std::memcpy((char*)buffer + i * (size), current->value, size);
+		int size = numberOfBytes;
+		auto addToBuffer = [&i, buffer, &size, offsetsBuffer](BTNode* current) {
+			std::memcpy((char*)buffer + i * (size), current->getValue(size), size);
+			if (offsetsBuffer)
+				std::memcpy((char*)offsetsBuffer + i, (void*)current->getOffset(size), 1);
 			i++;
 		};
 		IterrateWithCallback(root, addToBuffer);
 	}
 
-	void GetAllValuesWithBloom(void *buffer, void *bloomData, int bloomSize) {
+	//offsetsBuffer is a optional paramater, but without it just the values would be exported
+	void GetAllValuesWithBloom(void *buffer, void *bloomData, int bloomSize, void* offsetsBuffer = 0) {
 		int i = 0;
-		int size = numberOfBytes + 1;
-		auto addToBuffer = [&i, buffer, &size, bloomData, &bloomSize](BTNode* current) {
-			std::memcpy((char*)buffer + i * (size), current->value, size);
-			void* val = current->getValue(size - 1);
-			BloomFilter::AddValue(bloomData, val, size - 1, bloomSize);//-1 for offset byte
+		int size = numberOfBytes;
+		auto addToBuffer = [&i, buffer, &size, bloomData, &bloomSize, offsetsBuffer](BTNode* current) {
+			std::memcpy((char*)buffer + i * (size), current->getValue(size), size);
+			if (offsetsBuffer) {
+				uint8_t offset = current->getOffset(size);
+				std::memcpy((char*)offsetsBuffer + i, &offset, 1);
+			}
+				
+			void* val = current->getValue(size);
+			BloomFilter::AddValue(bloomData, val, size, bloomSize);
 			free(val);
 			i++;
 			};

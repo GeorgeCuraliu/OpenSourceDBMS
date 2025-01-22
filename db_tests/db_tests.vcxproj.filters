@@ -77,5 +77,8 @@
     <ClInclude Include="BitwiseHandler.h">
       <Filter>Header Files\lsm_tree</Filter>
     </ClInclude>
+    <ClInclude Include="FileData.h">
+      <Filter>Header Files\lsm_tree</Filter>
+    </ClInclude>
   </ItemGroup>
 </Project>

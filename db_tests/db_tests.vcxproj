@@ -146,6 +146,7 @@
     <ClInclude Include="BTree2.h" />
     <ClInclude Include="BufferManager.h" />
     <ClInclude Include="Column.h" />
+    <ClInclude Include="FileData.h" />
     <ClInclude Include="Query.h" />
     <ClInclude Include="LinkedList.h" />
     <ClInclude Include="Parameters.h" />

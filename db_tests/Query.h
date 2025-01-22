@@ -55,7 +55,8 @@ private:
 		std::cout << "" << std::endl;
 		for (int num : b) std::cout << num << " ";
 		std::cout << "" << std::endl;
-		if (a.size() == 0 || b.size() == 0) return;
+		if (a.size() == 0) b.clear();
+		if (b.size() == 0) a.clear();
 		for (auto it = a.begin(); it != a.end(); ) {
 			// Check if the current element is in b
 			if (std::find(b.begin(), b.end(), *it) == b.end()) {
@@ -134,11 +135,15 @@ public:
 	//Delete() assumes that querriesResult has just one querryResult
 	Query* Delete() {
 
-		auto deleteFromL0 = [this](Column* column) {
-			column->data->DeleteValues(querriesResults->head->L0_results);
-			};
-		table->columns.IterateWithCallback(deleteFromL0);
-		table->DeleteRow(querriesResults->head->L0_results);
+		if (querriesResults->head->L0_results.size()) {
+			auto deleteFromL0 = [this](Column* column) {
+				column->data->DeleteValues(querriesResults->head->L0_results);
+				};
+			table->columns.IterateWithCallback(deleteFromL0);
+			table->DeleteRow(querriesResults->head->L0_results);
+		}
+		
+		if(querriesResults->head->L1_results.size())
 		BufferManager::DeleteValuesLevel1(table, querriesResults->head->L1_results);
 
 		querriesResults->DeleteNode(querriesResults->head);
