@@ -178,7 +178,7 @@ void test4(Table& table) {
 	uint32_t* a11 = (uint32_t*)malloc(sizeof(uint32_t));
 	uint32_t* a22 = (uint32_t*)malloc(sizeof(uint32_t));
 	uint32_t* a33 = (uint32_t*)malloc(sizeof(uint32_t));
-	*a11 = 6334;
+	*a11 = 19169;
 	*a22 = 89;
 	*a33 = 100;
 	void* argss[] = { a11 };
@@ -186,13 +186,13 @@ void test4(Table& table) {
 	uint32_t* a111 = (uint32_t*)malloc(sizeof(uint32_t));
 	uint32_t* a222 = (uint32_t*)malloc(sizeof(uint32_t));
 	uint32_t* a333 = (uint32_t*)malloc(sizeof(uint32_t));
-	*a111 = 0;
+	*a111 = 4;
 	*a222 = 89 * 200;
 	*a333 = 100 * 200;
 	void* argsss[] = { a111 };
 
 	Query* query = new Query(&table);
-	query->FindByComparator((char*)"c1", argsss, 1, EQUALS);
+	//query->FindByComparator((char*)"c1", argsss, 1, EQUALS);
 	//query->FindByComparator((char*)"c1", argss, 1, EQUALS | BIGGER);
 	//query->Delete();
 	
@@ -218,7 +218,7 @@ void test4(Table& table) {
 	//query->Delete();
 
 	//query->FindByComparator((char*)"c1", argsss, 1, EQUALS)->Delete();
-	query->FindByComparator((char*)"c1", argsss, 1, EQUALS);
+	query->FindByComparator((char*)"c1", argsss, 1, EQUALS)->Delete();
 	query->FindByComparator((char*)"c2", argss, 1, EQUALS);
 
 	table.DisplayAllRows();

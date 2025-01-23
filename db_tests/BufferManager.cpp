@@ -170,7 +170,7 @@ void BufferManager::StoreLevel1(Table* table) {
 
 
 		//void* tombstones = calloc(16, 1);
-		for (int i = 512 + table->L1_registers * 16; i < table->L1_registers * 16 + 16; i++)
+		for (int i = BLOOM_FILTER_SIZE + table->L1_registers * 16; i < BLOOM_FILTER_SIZE + table->L1_registers * 16 + 16; i++)
 			((uint8_t*)metadata)[i] = 255;
 		SetFilePointer(fileHandle, 0, 0, NULL);
 		WriteFile(
@@ -339,11 +339,11 @@ void BufferManager::SearchLevel1(Table* table, Column* column, void* values[], i
 				if (!buffer) return;
 				//std::memcpy(value, (uint8_t*)buffer + j * (column->data->numberOfBytes), column->data->numberOfBytes);
 				//std::memcpy(offset, (uint8_t*)buffer + j * (column->data->numberOfBytes) + column->data->numberOfBytes, 1);
-
-				int comp = VoidMemoryHandler::COMPARE((uint8_t*)buffer + j, values[i], column->data->dataType);
+				//std::cout<<
+				int comp = VoidMemoryHandler::COMPARE((uint8_t*)buffer + j * column->data->numberOfBytes, values[i], column->data->dataType);
 				if (comp & comparator && BitwiseHandler::checkBit((uint8_t*)metadata + 512, j)) {
-					std::cout << "found match at offset " << *(int*)((char*)metadata)[512 + 32 + j] << " " << j << std::endl;
-					foundValues.push_back(*(int*)((char*)metadata)[512 + 32 + j]);
+					std::cout << "found match at offset " << (int)((char*)metadata)[512 + 32 + j] << " " << j << std::endl;
+					foundValues.push_back((int)((char*)metadata)[512 + 32 + j]);
 				}
 				//free(value);
 				//free(offset);
@@ -372,7 +372,7 @@ void BufferManager::DeleteValuesLevel1(Table* table, std::vector<int>& deleteVal
 		std::memcpy(fileName + tableNameLen + 1, column->name, columnNameLen);
 		fileName[tableNameLen + columnNameLen + 1] = '\0';
 
-		ClearTombstones(fileName, deleteValues, BLOOM_FILTER_SIZE);
+		ClearTombstones(fileName, deleteValues, BLOOM_FILTER_SIZE, table->L1_registers * 128, true);
 		
 		free(fileName);
 		};
@@ -382,8 +382,9 @@ void BufferManager::DeleteValuesLevel1(Table* table, std::vector<int>& deleteVal
 }
 
 
-
-void BufferManager::ClearTombstones(char* fileName, std::vector<int>& deleteValues, int offset){
+//->search offsets is a optional parameter that will decide if the tombstones`s order is represented by some offsets or by their disk order
+//->number of values is used in case the offsets are determined by another order than the disk order and it is needed to know how much space too allocate for metadata
+void BufferManager::ClearTombstones(char* fileName, std::vector<int>& deleteValues, int tombstonesOffset, int numberOfValues, bool searchOffsets){
 	HANDLE fileHandle = nullptr;
 	fileHandle = CreateFileA(
 		(LPCSTR)fileName,
@@ -394,15 +395,16 @@ void BufferManager::ClearTombstones(char* fileName, std::vector<int>& deleteValu
 		FILE_ATTRIBUTE_NORMAL,
 		NULL
 	);
-	SetFilePointer(fileHandle, 0, 0, NULL);
+	SetFilePointer(fileHandle, BLOOM_FILTER_SIZE, 0, NULL);
 
-	void* tombstones = calloc(32, 1);
+	int size = numberOfValues + 32;
+	void* metadata = malloc(size);
 	DWORD readBytes = 0;
-	SetFilePointer(fileHandle, offset, 0, NULL);
+	SetFilePointer(fileHandle, tombstonesOffset, 0, NULL);
 	ReadFile(
 		fileHandle,
-		tombstones,
-		32,
+		metadata,
+		size,
 		&readBytes,
 		NULL
 	);
@@ -410,8 +412,18 @@ void BufferManager::ClearTombstones(char* fileName, std::vector<int>& deleteValu
 
 	std::cout << "set tombstones to 0 at ";
 	for (auto it = deleteValues.begin(); it != deleteValues.end(); it++) {
-		std::cout << *it << " ";
-		BitwiseHandler::clearBit((uint8_t*)tombstones, *it);
+		if (searchOffsets)
+			for (int i = 0; i < numberOfValues; i++) {
+				if (*it == (int)((char*)metadata)[32 + i]) {
+					std::cout << *it << " ";
+					BitwiseHandler::clearBit((uint8_t*)metadata, i);
+				}
+			}
+		else {
+			BitwiseHandler::clearBit((uint8_t*)metadata, *it);
+			std::cout << *it << " ";
+		}
+			
 		//it = deleteValues.erase(it);
 	}
 	std::cout << "" << std::endl;
@@ -420,11 +432,11 @@ void BufferManager::ClearTombstones(char* fileName, std::vector<int>& deleteValu
 	SetFilePointer(fileHandle, BLOOM_FILTER_SIZE, 0, NULL);
 	WriteFile(
 		fileHandle,
-		tombstones,
+		metadata,
 		32,
 		&readBytes,
 		NULL
 	);
 	CloseHandle(fileHandle);
-	free(tombstones);
+	free(metadata);
 }
