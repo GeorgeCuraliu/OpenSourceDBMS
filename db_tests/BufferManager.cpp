@@ -172,7 +172,7 @@ void BufferManager::StoreLevel1(Table* table) {
 		//void* tombstones = calloc(16, 1);
 		for (int i = 512 + table->L1_registers * 16; i < table->L1_registers * 16 + 16; i++)
 			((uint8_t*)metadata)[i] = 255;
-		SetFilePointer(fileHandle, BLOOM_FILTER_SIZE + table->L1_registers * 16, 0, NULL);
+		SetFilePointer(fileHandle, 0, 0, NULL);
 		WriteFile(
 			fileHandle,
 			metadata,
@@ -341,7 +341,7 @@ void BufferManager::SearchLevel1(Table* table, Column* column, void* values[], i
 				//std::memcpy(offset, (uint8_t*)buffer + j * (column->data->numberOfBytes) + column->data->numberOfBytes, 1);
 
 				int comp = VoidMemoryHandler::COMPARE((uint8_t*)buffer + j, values[i], column->data->dataType);
-				if (comp & comparator && BitwiseHandler::checkBit((uint8_t*)metadata, *(int*)((char*)metadata)[512 + 32 + j])) {
+				if (comp & comparator && BitwiseHandler::checkBit((uint8_t*)metadata + 512, j)) {
 					std::cout << "found match at offset " << *(int*)((char*)metadata)[512 + 32 + j] << " " << j << std::endl;
 					foundValues.push_back(*(int*)((char*)metadata)[512 + 32 + j]);
 				}

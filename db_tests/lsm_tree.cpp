@@ -186,12 +186,13 @@ void test4(Table& table) {
 	uint32_t* a111 = (uint32_t*)malloc(sizeof(uint32_t));
 	uint32_t* a222 = (uint32_t*)malloc(sizeof(uint32_t));
 	uint32_t* a333 = (uint32_t*)malloc(sizeof(uint32_t));
-	*a111 = 10;
+	*a111 = 0;
 	*a222 = 89 * 200;
 	*a333 = 100 * 200;
 	void* argsss[] = { a111 };
 
 	Query* query = new Query(&table);
+	query->FindByComparator((char*)"c1", argsss, 1, EQUALS);
 	//query->FindByComparator((char*)"c1", argss, 1, EQUALS | BIGGER);
 	//query->Delete();
 	
