@@ -327,15 +327,15 @@ void BufferManager::SearchLevel1(Table* table, Column* column, void* values[], i
 			//	bufferSize = (column->data->numberOfBytes) * 128 * table->L1_registers;
 			//else
 			//	bufferSize = BUFFER_SIZE;
-
-		void* buffer = calloc(fileData->bufferSize, 1);
+		int bufferSize = fileData->totalValuesPerSegment * column->data->numberOfBytes;
+		void* buffer = calloc(bufferSize, 1);
 		DWORD numberOfBytesRead;
 
 		SetFilePointer(fileHandle, SEGMENT_SIZE * 2, 0, 0);
 		res = ReadFile(
 			fileHandle,
 			buffer,
-			fileData->bufferSize,
+			bufferSize,
 			&numberOfBytesRead,
 			NULL
 			);
@@ -355,6 +355,7 @@ void BufferManager::SearchLevel1(Table* table, Column* column, void* values[], i
 					foundValues.push_back((int)((uint8_t*)metadata)[512 + 32 + j]);
 				}
 			}
+				std::cout <<((int*)buffer)[index] << std::endl;
 				//free(value);
 				//free(offset);
 				//if(j)

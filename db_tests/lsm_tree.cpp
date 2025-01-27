@@ -186,7 +186,7 @@ void test4(Table& table) {
 	uint32_t* a111 = (uint32_t*)malloc(sizeof(uint32_t));
 	uint32_t* a222 = (uint32_t*)malloc(sizeof(uint32_t));
 	uint32_t* a333 = (uint32_t*)malloc(sizeof(uint32_t));
-	*a111 = 1;//4
+	*a111 = 4;//4
 	*a222 = 89 * 200;
 	*a333 = 100 * 200;
 	void* argsss[] = { a111 };
