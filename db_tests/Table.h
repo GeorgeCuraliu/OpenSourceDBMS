@@ -16,9 +16,9 @@ public:
 	uint8_t* freeMemory;//will be used to check if a place in values is free or not
 	char* name;
 	uint8_t L1_registers;
-	uint8_t L2_registers;
+	long long L2_registers;
 
-	Table(char* name, uint8_t L1_registers, uint8_t L2_registers);
+	Table(char* name, uint8_t L1_registers, long long L2_registers);
 
 	Column* AddColumn(char* name, char* type, uint8_t numberOfBytes);
 

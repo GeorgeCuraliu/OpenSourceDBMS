@@ -9,7 +9,7 @@
 #include "BitwiseHandler.h"
 
 
-Table::Table(char* name, uint8_t L1_registers, uint8_t L2_registers) :
+Table::Table(char* name, uint8_t L1_registers, long long L2_registers) :
 	numberOfValues(0),
 	numberOfColumns(0),
 	values(nullptr),
@@ -87,6 +87,8 @@ void Table::AddRow(void* newData[]) {
 		std::cout << "LIMIT REACHED --- FLUSHING" << std::endl;
 		FlushData();
 	}
+
+
 }
 
 
@@ -106,6 +108,10 @@ void Table::FlushData() {
 	if (L1_registers <= 1) {
 		BufferManager::StoreLevel1(this);
 		L1_registers++;
+	}
+	else {
+		BufferManager::StoreLevel2(this);
+		L1_registers = 0;
 	}
 	
 	for (int i = 0; i < 128 * rowSize; i++) ((char*)values)[i] = 0;
