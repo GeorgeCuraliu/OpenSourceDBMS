@@ -9,12 +9,12 @@
 
 void BufferManager::StoreLevel1(Table* table) {
 
-	char* fileName = (char*)calloc(sizeof(table->name) + 1, 1);
-	if (!fileName) return;
-	std::memcpy(fileName, table->name, std::strlen(table->name));
-	fileName[std::strlen(table->name)] = '-';
-	fileName[std::strlen(table->name) + 1] = table->L1_registers + 48;
-	fileName[std::strlen(table->name) + 2] = '\0';
+	//char* fileName = (char*)calloc(sizeof(table->name) + 1, 1);
+	//if (!fileName) return;
+	//std::memcpy(fileName, table->name, std::strlen(table->name));
+	//fileName[std::strlen(table->name)] = '-';
+	//fileName[std::strlen(table->name) + 1] = table->L1_registers + 48;
+	//fileName[std::strlen(table->name) + 2] = '\0';
 
 
 	HANDLE fileHandle = CreateFileA(
@@ -100,7 +100,7 @@ void BufferManager::StoreLevel1(Table* table) {
 
 
 	CloseHandle(fileHandle);
-	free(fileName);
+	//free(fileName);
 	free(bufferT);
 
 
@@ -467,11 +467,37 @@ void BufferManager::ClearTombstones(char* fileName, std::vector<int>& deleteValu
 
 
 
-
-
-
-
-
 void BufferManager::StoreLevel2(Table* table) {
+
+	HANDLE L1_register_handle = CreateFileA(
+		(LPCSTR)(table->name),
+		GENERIC_ALL,
+		FILE_SHARE_READ | FILE_SHARE_WRITE,
+		NULL,
+		OPEN_ALWAYS,
+		FILE_ATTRIBUTE_NORMAL,
+		NULL
+	);
+
+	char* fileName2 = (char*)calloc(sizeof(table->name) + 2, 1);
+	fileName2[0] = '2';
+	fileName2[1] = '_';
+	std::memcpy(fileName2 + 2, table->name, sizeof(table->name));
+
+	HANDLE L2_register_handle = CreateFileA(
+		(LPCSTR)(fileName2),
+		GENERIC_ALL,
+		FILE_SHARE_READ | FILE_SHARE_WRITE,
+		NULL,
+		OPEN_ALWAYS,
+		FILE_ATTRIBUTE_NORMAL,
+		NULL
+	);
+
+	if (L1_register_handle == INVALID_HANDLE_VALUE || L2_register_handle == INVALID_HANDLE_VALUE)	std::cerr << "CreateFileA failed, error: " << GetLastError() << std::endl;
+
+	while (true) {
+
+	}
 
 }

@@ -6,7 +6,7 @@ constexpr int BUFFER_SIZE = 4096;
 
 constexpr int L1_BLOOM_FILTER_SIZE = SEGMENT_SIZE;
 //32 -> tombstones  &  128 * 2 -> offsets
-constexpr int L1_METADATA = SEGMENT_SIZE + 32 + 128 * 2;
+constexpr int L1_METADATA = L1_BLOOM_FILTER_SIZE + 32 + 128 * 2;
 
 //comparators
 constexpr int EQUALS = 0x1;
