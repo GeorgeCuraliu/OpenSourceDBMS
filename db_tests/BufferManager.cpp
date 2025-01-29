@@ -467,6 +467,15 @@ void BufferManager::ClearTombstones(char* fileName, std::vector<int>& deleteValu
 
 
 
+long long BufferManager::GetL2Offset(long long registerNumber, int valueSize){
+	int valuesPerBuffer = BUFFER_SIZE / valueSize;
+	int valuesPerRegsiter = 128 * 3;
+	int register_size = int(valuesPerRegsiter / valuesPerBuffer) * BUFFER_SIZE + ceil(double(valuesPerRegsiter % valuesPerBuffer * valueSize) / double(SEGMENT_SIZE));
+	long long numberRegisterTombstones = ceil(double(registerNumber) / 4096);
+	long long offset = numberRegisterTombstones * SEGMENT_SIZE + register_size * registerNumber;
+	return offset;
+}
+
 void BufferManager::StoreLevel2(Table* table) {
 
 	HANDLE L1_register_handle = CreateFileA(
@@ -495,6 +504,31 @@ void BufferManager::StoreLevel2(Table* table) {
 	);
 
 	if (L1_register_handle == INVALID_HANDLE_VALUE || L2_register_handle == INVALID_HANDLE_VALUE)	std::cerr << "CreateFileA failed, error: " << GetLastError() << std::endl;
+
+	//register_size is calculated in segments occupied
+	//int valuesPerBuffer = BUFFER_SIZE / table->rowSize;
+	//int valuesPerRegsiter = 128 * 3;
+	//int register_size = int(valuesPerRegsiter / valuesPerBuffer) * BUFFER_SIZE + ceil(double(valuesPerRegsiter % valuesPerBuffer * table->rowSize) / double(SEGMENT_SIZE));
+	//long long numberRegisterTombstones = ceil(double(table->L2_registers) / 4096);
+	//long long offset = numberRegisterTombstones * SEGMENT_SIZE + register_size * table->L2_registers;
+
+	long long offset = GetL2Offset(table->L2_registers, table->rowSize);
+
+	SetFilePointer(L2_register_handle, offset, 0, NULL);
+	if (table->L2_registers % 4096 == 0) {
+		uint8_t* tombstones = (uint8_t*)malloc(512);
+		for (int i = 0; i < 512; i++)
+			tombstones[i] = 0;
+		DWORD wroteBytes = 0;
+		WriteFile(
+			L2_register_handle,
+			tombstones,
+			512,
+			&wroteBytes,
+			NULL
+		);
+		std::cout << "wrote " << wroteBytes << " bytes out of 512 -- RegisterTombstones" << std::endl;
+	}
 
 	while (true) {
 
