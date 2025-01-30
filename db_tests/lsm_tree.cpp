@@ -17,6 +17,7 @@ void test1(Table& table);
 void test2(Table& table);
 void test3(Table& table);
 void test4(Table& table);
+void test5(Table& table);
 
 int main(int argc, char* argv[]) {
 	char name1[] = "c1";
@@ -28,7 +29,7 @@ int main(int argc, char* argv[]) {
 	table.ConfirmDiagram();
 	table.DisplayColumns();
 
-	test4(table);
+	test5(table);
 
 	return 0;
 }
@@ -222,4 +223,20 @@ void test4(Table& table) {
 	query->FindByComparator((char*)"c2", argss, 1, EQUALS);
 
 	table.DisplayAllRows();
+}
+
+void test5(Table& table) {
+	for (int i = 0; i < 4 * 128; i++) {
+		int* a1 = (int*)malloc(4);
+		int* a2 = (int*)malloc(4);
+		*a1 = i;
+		//*a2 = 100000 - (i * 200);
+		*a2 = rand();
+		void* argss[] = { a1, a2 };
+		std::cout << "adding " << *(int*)a1 << " " << *(int*)a2 << std::endl;
+		table.AddRow(argss);
+		free(a1);
+		free(a2);
+		//free(argss);
+	}
 }

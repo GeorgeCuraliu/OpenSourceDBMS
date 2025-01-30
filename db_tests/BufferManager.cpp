@@ -465,12 +465,51 @@ void BufferManager::ClearTombstones(char* fileName, std::vector<int>& deleteValu
 
 
 
-
-
-long long BufferManager::GetL2Offset(long long registerNumber, int valueSize){
+int BufferManager::GetL2Size(long long registerNumber, int valueSize, int metadata){
 	int valuesPerBuffer = BUFFER_SIZE / valueSize;
 	int valuesPerRegsiter = 128 * 3;
-	int register_size = int(valuesPerRegsiter / valuesPerBuffer) * BUFFER_SIZE + ceil(double(valuesPerRegsiter % valuesPerBuffer * valueSize) / double(SEGMENT_SIZE));
+	int register_size = int(valuesPerRegsiter / valuesPerBuffer) * BUFFER_SIZE + ceil(double(valuesPerRegsiter % valuesPerBuffer * valueSize) / double(SEGMENT_SIZE)) + metadata;
+	return register_size;
+}
+
+long long BufferManager::GetL2FreeRegister(long long registerNumber, int valueSize, HANDLE fileHandle, int metadata){
+	if (!registerNumber) return -1;
+	int numberOfTombstones = registerNumber / 4096;
+	int registerSize = GetL2Size(registerNumber, valueSize,metadata);
+	long long offset = 0;
+	void* tombstones = malloc(512);
+	DWORD readBytes = 0;
+
+	for (int i = 0; i < numberOfTombstones; i++) {
+		SetFilePointer(fileHandle, offset, 0, NULL);
+		ReadFile(
+			fileHandle,
+			tombstones,
+			512,
+			&readBytes,
+			NULL
+		);
+		for(int j = 0; j < 512; j++)
+			if (!BitwiseHandler::checkBit((uint8_t*)tombstones, j)) {
+				BitwiseHandler::setBit((uint8_t*)tombstones, j);
+				WriteFile(
+					fileHandle,
+					tombstones,
+					512,
+					&readBytes,
+					NULL
+				);
+				free(tombstones);
+				return i * 512 + j;
+			}
+		offset += 4096 * registerSize + 512;
+	}
+	free(tombstones);
+	return -1;
+}
+
+long long BufferManager::GetL2Offset(long long registerNumber, int valueSize, int metadata){
+	int register_size = GetL2Size(registerNumber, valueSize,metadata);
 	long long numberRegisterTombstones = ceil(double(registerNumber) / 4096);
 	long long offset = numberRegisterTombstones * SEGMENT_SIZE + register_size * registerNumber;
 	return offset;
@@ -505,20 +544,23 @@ void BufferManager::StoreLevel2(Table* table) {
 
 	if (L1_register_handle == INVALID_HANDLE_VALUE || L2_register_handle == INVALID_HANDLE_VALUE)	std::cerr << "CreateFileA failed, error: " << GetLastError() << std::endl;
 
-	//register_size is calculated in segments occupied
-	//int valuesPerBuffer = BUFFER_SIZE / table->rowSize;
-	//int valuesPerRegsiter = 128 * 3;
-	//int register_size = int(valuesPerRegsiter / valuesPerBuffer) * BUFFER_SIZE + ceil(double(valuesPerRegsiter % valuesPerBuffer * table->rowSize) / double(SEGMENT_SIZE));
-	//long long numberRegisterTombstones = ceil(double(table->L2_registers) / 4096);
-	//long long offset = numberRegisterTombstones * SEGMENT_SIZE + register_size * table->L2_registers;
+	long long registerIndex = GetL2FreeRegister(table->L2_registers, table->rowSize, L2_register_handle, SEGMENT_SIZE);
+	long long offset;
+	if (registerIndex < 0)
+		offset = GetL2Offset(table->L2_registers, table->rowSize, SEGMENT_SIZE);
+	else
+		offset = GetL2Offset(registerIndex, table->rowSize, SEGMENT_SIZE);
 
-	long long offset = GetL2Offset(table->L2_registers, table->rowSize);
 
 	SetFilePointer(L2_register_handle, offset, 0, NULL);
+
+	//create new REGISTER TOMBSTONES if the rest are full
 	if (table->L2_registers % 4096 == 0) {
 		uint8_t* tombstones = (uint8_t*)malloc(512);
 		for (int i = 0; i < 512; i++)
 			tombstones[i] = 0;
+		//set to 1 the first bit -> current register
+		BitwiseHandler::setBit(tombstones, 0);
 		DWORD wroteBytes = 0;
 		WriteFile(
 			L2_register_handle,
@@ -527,11 +569,115 @@ void BufferManager::StoreLevel2(Table* table) {
 			&wroteBytes,
 			NULL
 		);
+		offset += 512;
 		std::cout << "wrote " << wroteBytes << " bytes out of 512 -- RegisterTombstones" << std::endl;
+		free(tombstones);
 	}
 
-	while (true) {
+	//write the value tombstones
+	DWORD wroteBytes;
+	void* tombstones = malloc(16 * 3);
+	for (int i = 16 * 2; i < 16 * 3; i++)
+		((uint8_t*)tombstones)[i] = 255;
+	SetFilePointer(L1_register_handle, 0, 0, NULL);
+	ReadFile(
+		L1_register_handle,
+		tombstones,
+		16,
+		&wroteBytes,
+		NULL
+	);
 
+
+	SetFilePointer(L2_register_handle, offset, 0, NULL);
+	WriteFile(
+		L2_register_handle,
+		tombstones,
+		16 * 3,
+		&wroteBytes,
+		NULL
+	);
+	offset += 512;
+
+
+	//write the values
+	int totalValuesPerBuffer = BUFFER_SIZE / table->rowSize;
+	int l1_offset = SEGMENT_SIZE;
+	int valuesPerBuffer = 0;
+	int wroteValues = 0;
+	int valuesToFill = 0;
+	if (valuesPerBuffer > 128 * 2)
+		valuesPerBuffer = 128 * 2;
+	else
+		valuesPerBuffer = totalValuesPerBuffer;
+	void* buffer = malloc(valuesPerBuffer * table->rowSize);
+
+	//read values from l1 and write them in l2
+	while (wroteValues < 128 * 2) {
+		SetFilePointer(L1_register_handle, l1_offset, 0, NULL);
+		SetFilePointer(L2_register_handle, offset, 0, NULL);
+		int valuesToWrite = valuesPerBuffer;
+		if (2 * 128 - wroteValues < valuesPerBuffer)
+			valuesToWrite = 2 * 128 - wroteValues;
+		ReadFile(
+			L1_register_handle,
+			buffer,
+			valuesToWrite * table->rowSize,
+			&wroteBytes,
+			NULL
+		);
+		WriteFile(
+			L2_register_handle,
+			buffer,
+			valuesToWrite * table->rowSize,
+			&wroteBytes,
+			NULL
+		);
+		wroteValues += valuesToWrite;
+		if (wroteValues < 128 * 2) {
+			offset += BUFFER_SIZE;
+			l1_offset += BUFFER_SIZE;
+		}
+		else {
+			offset += valuesToWrite * table->rowSize;
+			valuesToFill = totalValuesPerBuffer - valuesToWrite;
+			if (valuesToFill > 128) valuesToFill = 128;
+		}
 	}
+
+	wroteValues = 0;
+	WriteFile(
+		L2_register_handle,
+		table->values,
+		valuesToFill * table->rowSize,
+		&wroteBytes,
+		NULL
+	);
+	wroteValues += valuesToFill;
+	offset += BUFFER_SIZE;
+	SetFilePointer(L2_register_handle, offset, 0, NULL);
+
+	while (wroteValues < 128) {
+		int valuesToWrite = valuesPerBuffer;
+		if (128 - wroteValues < valuesPerBuffer)
+			valuesToWrite = 128 - wroteValues;
+		WriteFile(
+			L2_register_handle,
+			(uint8_t*)table->values + wroteValues * table->rowSize,
+			valuesToWrite * table->rowSize,
+			&wroteBytes,
+			NULL
+		);
+		wroteValues += valuesToWrite;
+		if (wroteValues < 128) {
+			offset += BUFFER_SIZE;
+		}
+	}
+
+	CloseHandle(L2_register_handle);
+	CloseHandle(L1_register_handle);
+	free(buffer);
+	free(tombstones);
+	free(fileName2);
 
 }
