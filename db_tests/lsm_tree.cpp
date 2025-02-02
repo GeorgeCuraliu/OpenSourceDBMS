@@ -226,7 +226,7 @@ void test4(Table& table) {
 }
 
 void test5(Table& table) {
-	for (int i = 0; i < 4 * 128; i++) {
+	for (int i = 0; i < 6 * 128; i++) {
 		int* a1 = (int*)malloc(4);
 		int* a2 = (int*)malloc(4);
 		*a1 = i;

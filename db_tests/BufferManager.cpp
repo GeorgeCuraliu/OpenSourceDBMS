@@ -109,7 +109,7 @@ void BufferManager::StoreLevel1(Table* table) {
 		void* dataToStore = malloc((column->data->numberOfBytes) * 128);
 		//void* bloomFilter = calloc(L1_BLOOM_FILTER_SIZE, 1);
 		//void* offsets = malloc(128);
-		void* metadata = calloc(L1_METADATA, 1);
+		void* metadata = calloc(L1_METADATA_SIZE, 1);
 		if (!dataToStore) std::cout << "could not allocate memory for dataToStore" << std::endl;
 
 		size_t tableNameLen = std::strlen(table->name);
@@ -143,7 +143,7 @@ void BufferManager::StoreLevel1(Table* table) {
 			bool res = ReadFile(
 				fileHandle,
 				metadata,
-				L1_METADATA,
+				L1_METADATA_SIZE,
 				&readBytes,
 				NULL
 			);
@@ -176,7 +176,7 @@ void BufferManager::StoreLevel1(Table* table) {
 		WriteFile(
 			fileHandle,
 			metadata,
-			L1_METADATA,
+			L1_METADATA_SIZE,
 			&numberOfBytesWritten,
 			NULL
 		);
@@ -255,7 +255,7 @@ void BufferManager::SearchLevel1(Table* table, Column* column, void* values[], i
 	size_t tableNameLen = std::strlen(table->name);
 	size_t columnNameLen = std::strlen(column->name);
 	//void* tombstones = calloc(32, 1);
-	void* metadata = malloc(L1_METADATA);
+	void* metadata = malloc(L1_METADATA_SIZE);
 	char* fileName = (char*)calloc(tableNameLen + columnNameLen + 2, sizeof(char)); // +1 for null terminator
 	if (!fileName) {
 		std::cerr << "Memory allocation failed!" << std::endl;
@@ -297,7 +297,7 @@ void BufferManager::SearchLevel1(Table* table, Column* column, void* values[], i
 	res = ReadFile(
 		fileHandle,
 		metadata,
-		L1_METADATA,
+		L1_METADATA_SIZE,
 		&readBytes,
 		NULL
 	);
@@ -468,13 +468,15 @@ void BufferManager::ClearTombstones(char* fileName, std::vector<int>& deleteValu
 int BufferManager::GetL2Size(long long registerNumber, int valueSize, int metadata){
 	int valuesPerBuffer = BUFFER_SIZE / valueSize;
 	int valuesPerRegsiter = 128 * 3;
-	int register_size = int(valuesPerRegsiter / valuesPerBuffer) * BUFFER_SIZE + ceil(double(valuesPerRegsiter % valuesPerBuffer * valueSize) / double(SEGMENT_SIZE)) + metadata;
+	int register_size = int(valuesPerRegsiter / valuesPerBuffer) * BUFFER_SIZE + ceil(double(valuesPerRegsiter % valuesPerBuffer * valueSize) / double(SEGMENT_SIZE)) * SEGMENT_SIZE + metadata;
 	return register_size;
 }
 
+
+//return -1 if there is no register free
 long long BufferManager::GetL2FreeRegister(long long registerNumber, int valueSize, HANDLE fileHandle, int metadata){
 	if (!registerNumber) return -1;
-	int numberOfTombstones = registerNumber / 4096;
+	int numberOfTombstones = ceil(double(registerNumber) / 4096);
 	int registerSize = GetL2Size(registerNumber, valueSize,metadata);
 	long long offset = 0;
 	void* tombstones = malloc(512);
@@ -489,7 +491,7 @@ long long BufferManager::GetL2FreeRegister(long long registerNumber, int valueSi
 			&readBytes,
 			NULL
 		);
-		for(int j = 0; j < 512; j++)
+		for(int j = 0; j < 512 * 8; j++)
 			if (!BitwiseHandler::checkBit((uint8_t*)tombstones, j)) {
 				BitwiseHandler::setBit((uint8_t*)tombstones, j);
 				WriteFile(
@@ -680,4 +682,156 @@ void BufferManager::StoreLevel2(Table* table) {
 	free(tombstones);
 	free(fileName2);
 
+
+	auto storeColumn = [table](Column* column) {
+		size_t tableNameLen = std::strlen(table->name);
+		size_t columnNameLen = std::strlen(column->name);
+		char* fileName2 = (char*)calloc(tableNameLen + columnNameLen + 4, sizeof(char)); // +1 for null terminator
+		if (!fileName2) {
+			std::cerr << "Memory allocation failed!" << std::endl;
+			return -1;  // Handle allocation failure
+		}
+
+		fileName2[0] = '2';
+		fileName2[1] = '_';
+		std::memcpy(fileName2 + 2, table->name, tableNameLen);
+		fileName2[tableNameLen + 2] = '&';
+		std::memcpy(fileName2 + tableNameLen + 3, column->name, columnNameLen);
+		fileName2[tableNameLen + columnNameLen + 3] = '\0';
+
+		HANDLE L2_register_handle = CreateFileA(
+			(LPCSTR)(fileName2),
+			GENERIC_ALL,
+			FILE_SHARE_WRITE,
+			NULL,
+			OPEN_ALWAYS,
+			FILE_ATTRIBUTE_NORMAL,
+			NULL
+		);
+
+		char* fileName = (char*)calloc(tableNameLen + columnNameLen + 2, sizeof(char)); // +1 for null terminator
+		if (!fileName) {
+			std::cerr << "Memory allocation failed!" << std::endl;
+			return -1;  // Handle allocation failure
+		}
+
+		std::memcpy(fileName, table->name, tableNameLen);
+		fileName[tableNameLen] = '&';
+		std::memcpy(fileName + tableNameLen + 1, column->name, columnNameLen);
+		fileName[tableNameLen + columnNameLen + 1] = '\0';
+
+		HANDLE L1_register_handle = CreateFileA(
+			(LPCSTR)(fileName),
+			GENERIC_ALL,
+			FILE_SHARE_WRITE,
+			NULL,
+			OPEN_ALWAYS,
+			FILE_ATTRIBUTE_NORMAL,
+			NULL
+		);
+
+
+		long long registerIndex = GetL2FreeRegister(table->L2_registers, column->data->numberOfBytes, L2_register_handle, L2_METADATA_SIZE);
+		long long offset;
+		if (registerIndex < 0)
+			offset = GetL2Offset(table->L2_registers, column->data->numberOfBytes, L2_METADATA_SIZE);
+		else
+			offset = GetL2Offset(registerIndex, column->data->numberOfBytes, L2_METADATA_SIZE);
+
+
+		SetFilePointer(L2_register_handle, offset, 0, NULL);
+		SetFilePointer(L1_register_handle, 0, 0, NULL);
+
+		void* metadata = calloc(L2_METADATA_SIZE, 1);
+		void* L1_metadata = malloc(L1_METADATA_SIZE);
+		//+128 for the offsets
+		void* l2_temp = malloc(column->data->numberOfBytes * 128 + 128);
+			
+		DWORD bytes;
+		ReadFile(
+			L1_register_handle,
+			L1_metadata,
+			L1_METADATA_SIZE,
+			&bytes,
+			NULL
+		);
+
+		//write the tombstones
+		std::memcpy((char*)metadata + 720, (char*)L1_metadata + 512, 32);
+		for (int i = 0; i < 16; i++)
+			((char*)metadata)[720 + 32 + i] = 255;
+
+
+		int totalValuesPerBuffer = BUFFER_SIZE / column->data->numberOfBytes;
+		int l1_offset = SEGMENT_SIZE * 2;
+		int valuesPerBuffer = 0;
+		int wroteValues = 0;
+		int L1_index = 0;
+		int L2_index = 0;
+		int buffer_index = 0;
+		int valuesToFill = 0;
+		if (valuesPerBuffer > 128 * 2)
+			valuesPerBuffer = 128 * 2;
+		else
+			valuesPerBuffer = totalValuesPerBuffer;
+		void* L1_buffer = malloc(valuesPerBuffer * column->data->numberOfBytes);
+		void* L2_buffer = malloc(valuesPerBuffer * column->data->numberOfBytes);
+		column->data->GetAllValuesWithBloom(l2_temp, metadata, 720, (char*)l2_temp + column->data->numberOfBytes * 128);
+
+		SetFilePointer(L2_register_handle, l1_offset, 0, NULL);
+		ReadFile(
+			L1_register_handle,
+			L1_buffer,
+			valuesPerBuffer * column->data->numberOfBytes,
+			&bytes,
+			NULL
+		);
+
+		while (wroteValues < 128 * 3) {
+
+			if(L1_index < 128 * 2 && L2_index < 128){
+				int res = VoidMemoryHandler::COMPARE((char*)L1_buffer + (L1_index % valuesPerBuffer) * column->data->numberOfBytes, (char*)l2_temp + L2_index * column->data->numberOfBytes, column->data->dataType);
+				if (res == LESS) {
+					std::memcpy((char*)L2_buffer + buffer_index * column->data->numberOfBytes, (char*)L1_buffer + (L1_index % valuesPerBuffer) * column->data->numberOfBytes, column->data->numberOfBytes);
+					std::memcpy((char*)metadata + 720 + 48 + wroteValues * 2 + 1, (char*)L1_metadata + 512 + 32 + l1_offset, 1);
+					l1_offset++;
+				}
+				else {
+					std::memcpy((char*)L2_buffer + buffer_index * column->data->numberOfBytes, (char*)l2_temp + L2_index * column->data->numberOfBytes, column->data->numberOfBytes);
+					uint16_t temp = *((char*)l2_temp + column->data->numberOfBytes * 128 + L2_index);
+					temp += 128 * 2;
+					std::memcpy((char*)metadata + 720 + 48 + wroteValues * 2, &temp, 2);
+					L2_index++;
+				}
+			}else if(L1_index < 128 * 2){
+				std::memcpy((char*)L2_buffer + buffer_index * column->data->numberOfBytes, (char*)L1_buffer + (L1_index % valuesPerBuffer) * column->data->numberOfBytes, column->data->numberOfBytes);
+				std::memcpy((char*)metadata + 720 + 48 + wroteValues * 2 + 1, (char*)L1_metadata + 512 + 32 + l1_offset, 1);
+				l1_offset++;
+			}
+			else {
+				std::memcpy((char*)L2_buffer + buffer_index * column->data->numberOfBytes, (char*)l2_temp + L2_index * column->data->numberOfBytes, column->data->numberOfBytes);
+				uint16_t temp = *((char*)l2_temp + column->data->numberOfBytes * 128 + L2_index);
+				temp += 128 * 2;
+				std::memcpy((char*)metadata + 720 + 48 + wroteValues * 2, &temp, 2);
+				L2_index++;
+			}
+
+			wroteValues++;
+			if (offset == valuesPerBuffer - 1 && L1_index < 128 * 2) {
+				SetFilePointer(L2_register_handle, l1_offset, 0, NULL);
+				ReadFile(
+					L1_register_handle,
+					L1_buffer,
+					valuesPerBuffer* table->rowSize,
+					&bytes,
+					NULL
+				);
+				offset += BUFFER_SIZE;
+			}
+		}
+
+
+
+		};
+	table->columns.IterateWithCallback(storeColumn);
 }
