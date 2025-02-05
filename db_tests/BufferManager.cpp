@@ -737,6 +737,8 @@ void BufferManager::StoreLevel2(Table* table) {
 			offset = GetL2Offset(table->L2_registers, column->data->numberOfBytes, L2_METADATA_SIZE);
 		else
 			offset = GetL2Offset(registerIndex, column->data->numberOfBytes, L2_METADATA_SIZE);
+		long long metadataOffest = offset;
+		offset += L2_METADATA_SIZE;
 
 
 		SetFilePointer(L2_register_handle, offset, 0, NULL);
@@ -745,7 +747,7 @@ void BufferManager::StoreLevel2(Table* table) {
 		void* metadata = calloc(L2_METADATA_SIZE, 1);
 		void* L1_metadata = malloc(L1_METADATA_SIZE);
 		//+128 for the offsets
-		void* l2_temp = malloc(column->data->numberOfBytes * 128 + 128);
+		void* l2_data = malloc(column->data->numberOfBytes * 128 + 128);
 			
 		DWORD bytes;
 		ReadFile(
@@ -757,81 +759,271 @@ void BufferManager::StoreLevel2(Table* table) {
 		);
 
 		//write the tombstones
-		std::memcpy((char*)metadata + 720, (char*)L1_metadata + 512, 32);
-		for (int i = 0; i < 16; i++)
-			((char*)metadata)[720 + 32 + i] = 255;
+		//std::memcpy((char*)metadata + 720, (char*)L1_metadata + 512, 32);
+		//for (int i = 0; i < 16; i++)
+		//	((char*)metadata)[720 + 32 + i] = 255;
 
 
 		int totalValuesPerBuffer = BUFFER_SIZE / column->data->numberOfBytes;
-		int l1_offset = SEGMENT_SIZE * 2;
+		int L1_1_offset = SEGMENT_SIZE * 2;
+		int L1_2_offset = 0;
 		int valuesPerBuffer = 0;
 		int wroteValues = 0;
-		int L1_index = 0;
+		int L1_index_1 = 0;
+		int L1_index_2 = 0;
 		int L2_index = 0;
+		int currentValues_L1_1 = 0;
+		int currentValues_L1_2 = 0;
+		int currentIndex_L1_1 = 0;
+		int currentIndex_L1_2 = 0;
+		int currentIndexL2 = 0;
 		int buffer_index = 0;
 		int valuesToFill = 0;
-		if (valuesPerBuffer > 128 * 2)
-			valuesPerBuffer = 128 * 2;
+		if (totalValuesPerBuffer > 128)
+			valuesPerBuffer = 128;
 		else
 			valuesPerBuffer = totalValuesPerBuffer;
-		void* L1_buffer = malloc(valuesPerBuffer * column->data->numberOfBytes);
+		void* L1_1_buffer = malloc(valuesPerBuffer * column->data->numberOfBytes);
+		void* L1_2_buffer = malloc(valuesPerBuffer * column->data->numberOfBytes);
 		void* L2_buffer = malloc(valuesPerBuffer * column->data->numberOfBytes);
-		column->data->GetAllValuesWithBloom(l2_temp, metadata, 720, (char*)l2_temp + column->data->numberOfBytes * 128);
+		column->data->GetAllValuesWithBloom(l2_data, metadata, 720, (char*)l2_data + column->data->numberOfBytes * 128);
 
-		SetFilePointer(L2_register_handle, l1_offset, 0, NULL);
+
+		//calculate the offset and number of values to read from the first buffer of l1 -> second register
+		int valuesToRead;
+		int segment = floor(128 / totalValuesPerBuffer);
+		int writtenValues;
+		if (valuesPerBuffer == 128) writtenValues = valuesPerBuffer;
+		else writtenValues = 128 % valuesPerBuffer;
+		L1_2_offset = BUFFER_SIZE * (segment)+writtenValues * (column->data->numberOfBytes) + L1_METADATA_SIZE;
+		valuesToRead = totalValuesPerBuffer - writtenValues;
+		if (valuesToRead > 128) valuesToRead = 128;
+
+		currentValues_L1_2 = valuesToRead;
+		currentValues_L1_1 = valuesPerBuffer;
+
+		SetFilePointer(L1_register_handle, L1_1_offset, 0, NULL);
 		ReadFile(
 			L1_register_handle,
-			L1_buffer,
+			L1_1_buffer,
 			valuesPerBuffer * column->data->numberOfBytes,
 			&bytes,
 			NULL
 		);
 
+
+		SetFilePointer(L1_register_handle, L1_2_offset, 0, NULL);
+		ReadFile(
+			L1_register_handle,
+			L1_2_buffer,
+			valuesToRead * column->data->numberOfBytes,
+			&bytes,
+			NULL
+		);
+
+
+
+
+
 		while (wroteValues < 128 * 3) {
 
-			if(L1_index < 128 * 2 && L2_index < 128){
-				int res = VoidMemoryHandler::COMPARE((char*)L1_buffer + (L1_index % valuesPerBuffer) * column->data->numberOfBytes, (char*)l2_temp + L2_index * column->data->numberOfBytes, column->data->dataType);
-				if (res == LESS) {
-					std::memcpy((char*)L2_buffer + buffer_index * column->data->numberOfBytes, (char*)L1_buffer + (L1_index % valuesPerBuffer) * column->data->numberOfBytes, column->data->numberOfBytes);
-					std::memcpy((char*)metadata + 720 + 48 + wroteValues * 2 + 1, (char*)L1_metadata + 512 + 32 + l1_offset, 1);
-					l1_offset++;
+			//compare current values betwen L1_1, L1_2 & L2
+			int equalOrLess = EQUALS | LESS;
+			int compL1_1__L1_2;
+			int compL1_1__L2;
+			int compL1_2__L1_1;
+			int compL1_2__L2;
+
+
+			if (L1_index_1 < 128 && L1_index_2 < 128) {
+				compL1_1__L1_2 = VoidMemoryHandler::COMPARE((char*)L1_1_buffer + currentIndex_L1_1 * column->data->numberOfBytes, (char*)L1_2_buffer + currentIndex_L1_2 * column->data->numberOfBytes, column->data->dataType);
+			}
+			if (L1_index_1 < 128 && L2_index < 128) {
+				compL1_1__L2 = VoidMemoryHandler::COMPARE((char*)L1_1_buffer + currentIndex_L1_1 * column->data->numberOfBytes, (char*)l2_data + L2_index * column->data->numberOfBytes, column->data->dataType);
+			}
+			if (L1_index_2 < 128 && L1_index_1 < 128) {
+				compL1_2__L1_1 = VoidMemoryHandler::COMPARE((char*)L1_2_buffer + currentIndex_L1_2 * column->data->numberOfBytes, (char*)L1_1_buffer + currentIndex_L1_1 * column->data->numberOfBytes, column->data->dataType);
+			}
+			if (L1_index_2 < 128 && L2_index < 128) {
+				compL1_2__L2 = VoidMemoryHandler::COMPARE((char*)L1_2_buffer + currentIndex_L1_2 * column->data->numberOfBytes, (char*)l2_data + L2_index * column->data->numberOfBytes, column->data->dataType);
+			}
+
+
+			if (L1_index_1 >= 128) {
+				compL1_1__L1_2 = BIGGER;
+				compL1_1__L2 = BIGGER;
+				compL1_2__L1_1 = LESS;
+			}
+			if (L1_index_2 >= 128) {
+				compL1_2__L1_1 = BIGGER;
+				compL1_2__L2 = BIGGER;
+				compL1_1__L1_2 = LESS;
+			}
+			if (L2_index >= 128) {
+				compL1_1__L2 = LESS;
+				compL1_2__L2 = LESS;
+			}
+
+
+			if (compL1_1__L1_2 & equalOrLess && compL1_1__L2 & equalOrLess) {
+				std::memcpy((char*)L2_buffer + currentIndexL2 * column->data->numberOfBytes, (char*)L1_1_buffer + currentIndex_L1_1 * column->data->numberOfBytes, column->data->numberOfBytes);
+				uint16_t offset = *((uint8_t*)L1_metadata + L1_BLOOM_FILTER_SIZE + 32 + L1_index_1);
+				std::memcpy((char*)metadata + L2_BLOOM_FILTER_SIZE + 48 + wroteValues * 2, &offset, 2);
+				bool tombstone = BitwiseHandler::checkBit((uint8_t*)L1_metadata + L1_BLOOM_FILTER_SIZE, L1_index_1);
+				if (tombstone) {
+					BitwiseHandler::setBit((uint8_t*)metadata + 720, wroteValues);
 				}
 				else {
-					std::memcpy((char*)L2_buffer + buffer_index * column->data->numberOfBytes, (char*)l2_temp + L2_index * column->data->numberOfBytes, column->data->numberOfBytes);
-					uint16_t temp = *((char*)l2_temp + column->data->numberOfBytes * 128 + L2_index);
-					temp += 128 * 2;
-					std::memcpy((char*)metadata + 720 + 48 + wroteValues * 2, &temp, 2);
-					L2_index++;
+					BitwiseHandler::clearBit((uint8_t*)metadata + 720, wroteValues);
 				}
-			}else if(L1_index < 128 * 2){
-				std::memcpy((char*)L2_buffer + buffer_index * column->data->numberOfBytes, (char*)L1_buffer + (L1_index % valuesPerBuffer) * column->data->numberOfBytes, column->data->numberOfBytes);
-				std::memcpy((char*)metadata + 720 + 48 + wroteValues * 2 + 1, (char*)L1_metadata + 512 + 32 + l1_offset, 1);
-				l1_offset++;
+				BloomFilter::AddValue(metadata, (char*)L1_1_buffer + currentIndex_L1_1 * column->data->numberOfBytes, column->data->numberOfBytes, 720);
+				currentIndexL2++;
+				currentIndex_L1_1++;
+				wroteValues++;
+				L1_index_1++;
+			}
+			else if (compL1_2__L1_1 & equalOrLess && compL1_2__L2 & equalOrLess) {
+				std::memcpy((char*)L2_buffer + currentIndexL2 * column->data->numberOfBytes, (char*)L1_2_buffer + currentIndex_L1_2 * column->data->numberOfBytes, column->data->numberOfBytes);
+				uint16_t offset = *((uint8_t*)L1_metadata + L1_BLOOM_FILTER_SIZE + 32 + L1_index_2 + 128);
+				std::memcpy((char*)metadata + L2_BLOOM_FILTER_SIZE + 48 + wroteValues * 2, &offset, 2);
+				bool tombstone = BitwiseHandler::checkBit((uint8_t*)L1_metadata + L1_BLOOM_FILTER_SIZE, L1_index_2 + 128);
+				if (tombstone) {
+					BitwiseHandler::setBit((uint8_t*)metadata + 720, wroteValues);
+				}
+				else {
+					BitwiseHandler::clearBit((uint8_t*)metadata + 720, wroteValues);
+				}
+				BloomFilter::AddValue(metadata, (char*)L1_2_buffer + currentIndex_L1_2 * column->data->numberOfBytes, column->data->numberOfBytes, 720);
+				currentIndexL2++;
+				currentIndex_L1_2++;
+				wroteValues++;
+				L1_index_2++;
 			}
 			else {
-				std::memcpy((char*)L2_buffer + buffer_index * column->data->numberOfBytes, (char*)l2_temp + L2_index * column->data->numberOfBytes, column->data->numberOfBytes);
-				uint16_t temp = *((char*)l2_temp + column->data->numberOfBytes * 128 + L2_index);
-				temp += 128 * 2;
-				std::memcpy((char*)metadata + 720 + 48 + wroteValues * 2, &temp, 2);
+				std::memcpy((char*)L2_buffer + currentIndexL2 * column->data->numberOfBytes, (char*)l2_data + L2_index * column->data->numberOfBytes, column->data->numberOfBytes);
+				uint16_t offset = *((uint8_t*)L1_metadata + L1_BLOOM_FILTER_SIZE + 32 + L1_index_2) + 128 + 128;
+				std::memcpy((char*)metadata + L2_BLOOM_FILTER_SIZE + 48 + wroteValues * 2, &offset, 2);
+				BitwiseHandler::setBit((uint8_t*)metadata + 720, wroteValues);
+				currentIndexL2++;
+				wroteValues++;
 				L2_index++;
 			}
 
-			wroteValues++;
-			if (offset == valuesPerBuffer - 1 && L1_index < 128 * 2) {
-				SetFilePointer(L2_register_handle, l1_offset, 0, NULL);
+
+			if (currentIndex_L1_1 > currentValues_L1_1 && L1_index_1 <= 128) {
+				int remainingValues = 128 - L1_index_1;
+				if (remainingValues > valuesPerBuffer)
+					remainingValues = valuesPerBuffer;
+				//in case the offsets points to the middle of a buffer, now it will point to the beggining of the next one
+				L1_1_offset = (L1_1_offset - L1_METADATA_SIZE) / BUFFER_SIZE * BUFFER_SIZE + L1_METADATA_SIZE;
+				currentValues_L1_1 = remainingValues;
+				currentIndex_L1_1 = 0;
+				SetFilePointer(L1_register_handle, L1_1_offset, 0, NULL);
 				ReadFile(
 					L1_register_handle,
-					L1_buffer,
-					valuesPerBuffer* table->rowSize,
+					L1_1_buffer,
+					remainingValues * column->data->numberOfBytes,
+					&bytes,
+					NULL
+				);
+			}
+			if (currentIndex_L1_2 > currentValues_L1_2 && L1_index_2 <= 128) {
+				int remainingValues = 128 - L1_index_2;
+				if (remainingValues > valuesPerBuffer)
+					remainingValues = valuesPerBuffer;
+				//in case the offsets points to the middle of a buffer, now it will point to the beggining of the next one
+				L1_2_offset = (L1_2_offset - L1_METADATA_SIZE) / BUFFER_SIZE * BUFFER_SIZE + L1_METADATA_SIZE;
+				currentValues_L1_2 = remainingValues;
+				currentIndex_L1_2 = 0;
+				SetFilePointer(L1_register_handle, L1_2_offset, 0, NULL);
+				ReadFile(
+					L1_register_handle,
+					L1_2_buffer,
+					remainingValues * column->data->numberOfBytes,
+					&bytes,
+					NULL
+				);
+			}
+			//write the L2_buffer in disk
+			if (currentIndexL2 == valuesPerBuffer || wroteValues == 3 * 128) {
+				SetFilePointer(L2_register_handle, offset, 0, NULL);
+				WriteFile(
+					L2_register_handle,
+					L2_buffer,
+					valuesPerBuffer* column->data->numberOfBytes,
 					&bytes,
 					NULL
 				);
 				offset += BUFFER_SIZE;
+				currentIndexL2 = 0;
 			}
+
+
+
+
+
+			//if(L1_index < 128 * 2 && L2_index < 128){
+			//	int res = VoidMemoryHandler::COMPARE((char*)L1_buffer + (L1_index % valuesPerBuffer) * column->data->numberOfBytes, (char*)l2_temp + L2_index * column->data->numberOfBytes, column->data->dataType);
+			//	if (res == LESS) {
+			//		std::memcpy((char*)L2_buffer + buffer_index * column->data->numberOfBytes, (char*)L1_buffer + (L1_index % valuesPerBuffer) * column->data->numberOfBytes, column->data->numberOfBytes);
+			//		std::memcpy((char*)metadata + 720 + 48 + wroteValues * 2 + 1, (char*)L1_metadata + 512 + 32 + l1_offset, 1);
+			//		L1_index++;
+			//	}
+			//	else {
+			//		std::memcpy((char*)L2_buffer + buffer_index * column->data->numberOfBytes, (char*)l2_temp + L2_index * column->data->numberOfBytes, column->data->numberOfBytes);
+			//		uint16_t temp = *((char*)l2_temp + column->data->numberOfBytes * 128 + L2_index);
+			//		temp += 128 * 2;
+			//		std::memcpy((char*)metadata + 720 + 48 + wroteValues * 2, &temp, 2);
+			//		L2_index++;
+			//	}
+			//}else if(L1_index < 128 * 2){
+			//	std::memcpy((char*)L2_buffer + buffer_index * column->data->numberOfBytes, (char*)L1_buffer + (L1_index % valuesPerBuffer) * column->data->numberOfBytes, column->data->numberOfBytes);
+			//	std::memcpy((char*)metadata + 720 + 48 + wroteValues * 2 + 1, (char*)L1_metadata + 512 + 32 + l1_offset, 1);
+			//	L1_index++;
+			//}
+			//else {
+			//	std::memcpy((char*)L2_buffer + buffer_index * column->data->numberOfBytes, (char*)l2_temp + L2_index * column->data->numberOfBytes, column->data->numberOfBytes);
+			//	uint16_t temp = *((char*)l2_temp + column->data->numberOfBytes * 128 + L2_index);
+			//	temp += 128 * 2;
+			//	std::memcpy((char*)metadata + 720 + 48 + wroteValues * 2, &temp, 2);
+			//	L2_index++;
+			//}
+
+			//wroteValues++;
+			//if (offset == valuesPerBuffer - 1 && L1_index < 128 * 2) {
+			//	SetFilePointer(L2_register_handle, l1_offset, 0, NULL);
+			//	ReadFile(
+			//		L1_register_handle,
+			//		L1_buffer,
+			//		valuesPerBuffer* table->rowSize,
+			//		&bytes,
+			//		NULL
+			//	);
+			//	offset += BUFFER_SIZE;
+			//}
+			//if(L2_index )
 		}
+		SetFilePointer(L2_register_handle, metadataOffest, 0, NULL);
+		WriteFile(
+			L2_register_handle,
+			metadata,
+			L2_METADATA_SIZE,
+			&bytes,
+			NULL
+		);
 
 
+
+		CloseHandle(L2_register_handle);
+		CloseHandle(L1_register_handle);
+		free(fileName2);
+		free(metadata);
+		free(L1_metadata);
+		free(l2_data);
+		free(L1_1_buffer);
+		free(L1_2_buffer);
+		free(L2_buffer);
 
 		};
 	table->columns.IterateWithCallback(storeColumn);
-}
+};

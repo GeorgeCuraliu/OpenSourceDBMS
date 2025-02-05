@@ -46,11 +46,11 @@ public:
 
 	//used to fill a segment, if there is remaining space from last register
 	void fillEmptySpace(int &offset) {
-		int segment = 128 / valuesPerSegment;
+		int segment = floor(128 / totalValuesPerSegment);
 		int writtenValues;
 		if (valuesPerSegment == 128) writtenValues = valuesPerSegment;
 		else writtenValues = 128 % valuesPerSegment;
-		offset = BUFFER_SIZE * (segment - 1) + writtenValues * (valueSize) + metadata;
+		offset = BUFFER_SIZE * (segment) + writtenValues * (valueSize) + metadata;
 		valuesToWrite = totalValuesPerSegment - writtenValues;
 		if (valuesToWrite > 128) valuesToWrite = 128;
 		wroteValues += valuesToWrite;
