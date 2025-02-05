@@ -502,7 +502,7 @@ long long BufferManager::GetL2FreeRegister(long long registerNumber, int valueSi
 					NULL
 				);
 				free(tombstones);
-				return i * 512 + j;
+				return i * 512 * 8 + j;
 			}
 		offset += 4096 * registerSize + 512;
 	}
@@ -533,6 +533,7 @@ void BufferManager::StoreLevel2(Table* table) {
 	fileName2[0] = '2';
 	fileName2[1] = '_';
 	std::memcpy(fileName2 + 2, table->name, sizeof(table->name));
+	bool increaseL2Registers = false;
 
 	HANDLE L2_register_handle = CreateFileA(
 		(LPCSTR)(fileName2),
@@ -548,8 +549,11 @@ void BufferManager::StoreLevel2(Table* table) {
 
 	long long registerIndex = GetL2FreeRegister(table->L2_registers, table->rowSize, L2_register_handle, SEGMENT_SIZE);
 	long long offset;
-	if (registerIndex < 0)
+	if (registerIndex < 0) {
 		offset = GetL2Offset(table->L2_registers, table->rowSize, SEGMENT_SIZE);
+		increaseL2Registers = true;
+	}
+		
 	else
 		offset = GetL2Offset(registerIndex, table->rowSize, SEGMENT_SIZE);
 
@@ -683,7 +687,7 @@ void BufferManager::StoreLevel2(Table* table) {
 	free(fileName2);
 
 
-	auto storeColumn = [table](Column* column) {
+	auto storeColumn = [table, registerIndex](Column* column) {
 		size_t tableNameLen = std::strlen(table->name);
 		size_t columnNameLen = std::strlen(column->name);
 		char* fileName2 = (char*)calloc(tableNameLen + columnNameLen + 4, sizeof(char)); // +1 for null terminator
@@ -731,7 +735,7 @@ void BufferManager::StoreLevel2(Table* table) {
 		);
 
 
-		long long registerIndex = GetL2FreeRegister(table->L2_registers, column->data->numberOfBytes, L2_register_handle, L2_METADATA_SIZE);
+		//long long registerIndex = GetL2FreeRegister(table->L2_registers, column->data->numberOfBytes, L2_register_handle, L2_METADATA_SIZE);
 		long long offset;
 		if (registerIndex < 0)
 			offset = GetL2Offset(table->L2_registers, column->data->numberOfBytes, L2_METADATA_SIZE);
@@ -739,6 +743,29 @@ void BufferManager::StoreLevel2(Table* table) {
 			offset = GetL2Offset(registerIndex, column->data->numberOfBytes, L2_METADATA_SIZE);
 		long long metadataOffest = offset;
 		offset += L2_METADATA_SIZE;
+
+		SetFilePointer(L2_register_handle, offset, 0, NULL);
+
+		//create new REGISTER TOMBSTONES if the rest are full
+		if (table->L2_registers % 4096 == 0) {
+			uint8_t* tombstones = (uint8_t*)malloc(512);
+			for (int i = 0; i < 512; i++)
+				tombstones[i] = 0;
+			//set to 1 the first bit -> current register
+			BitwiseHandler::setBit(tombstones, 0);
+			DWORD wroteBytes = 0;
+			WriteFile(
+				L2_register_handle,
+				tombstones,
+				512,
+				&wroteBytes,
+				NULL
+			);
+			offset += 512;
+			metadataOffest += 512;
+			std::cout << "wrote " << wroteBytes << " bytes out of 512 -- RegisterTombstones" << std::endl;
+			free(tombstones);
+		}
 
 
 		SetFilePointer(L2_register_handle, offset, 0, NULL);
@@ -785,7 +812,7 @@ void BufferManager::StoreLevel2(Table* table) {
 			valuesPerBuffer = totalValuesPerBuffer;
 		void* L1_1_buffer = malloc(valuesPerBuffer * column->data->numberOfBytes);
 		void* L1_2_buffer = malloc(valuesPerBuffer * column->data->numberOfBytes);
-		void* L2_buffer = malloc(valuesPerBuffer * column->data->numberOfBytes);
+		void* L2_buffer = malloc(totalValuesPerBuffer * column->data->numberOfBytes);
 		column->data->GetAllValuesWithBloom(l2_data, metadata, 720, (char*)l2_data + column->data->numberOfBytes * 128);
 
 
@@ -795,7 +822,7 @@ void BufferManager::StoreLevel2(Table* table) {
 		int writtenValues;
 		if (valuesPerBuffer == 128) writtenValues = valuesPerBuffer;
 		else writtenValues = 128 % valuesPerBuffer;
-		L1_2_offset = BUFFER_SIZE * (segment)+writtenValues * (column->data->numberOfBytes) + L1_METADATA_SIZE;
+		L1_2_offset = BUFFER_SIZE * (segment) + writtenValues * (column->data->numberOfBytes) + 2 * 512;
 		valuesToRead = totalValuesPerBuffer - writtenValues;
 		if (valuesToRead > 128) valuesToRead = 128;
 
@@ -866,6 +893,7 @@ void BufferManager::StoreLevel2(Table* table) {
 
 
 			if (compL1_1__L1_2 & equalOrLess && compL1_1__L2 & equalOrLess) {
+				std::cout << "L1_1 " << *(int*)((char*)L1_1_buffer + currentIndex_L1_1 * column->data->numberOfBytes) << " -- " << (int)(*((uint8_t*)L1_metadata + L1_BLOOM_FILTER_SIZE + 32 + L1_index_1)) << std::endl;
 				std::memcpy((char*)L2_buffer + currentIndexL2 * column->data->numberOfBytes, (char*)L1_1_buffer + currentIndex_L1_1 * column->data->numberOfBytes, column->data->numberOfBytes);
 				uint16_t offset = *((uint8_t*)L1_metadata + L1_BLOOM_FILTER_SIZE + 32 + L1_index_1);
 				std::memcpy((char*)metadata + L2_BLOOM_FILTER_SIZE + 48 + wroteValues * 2, &offset, 2);
@@ -883,6 +911,7 @@ void BufferManager::StoreLevel2(Table* table) {
 				L1_index_1++;
 			}
 			else if (compL1_2__L1_1 & equalOrLess && compL1_2__L2 & equalOrLess) {
+				std::cout << "L1_2 " << *(int*)((char*)L1_2_buffer + currentIndex_L1_2 * column->data->numberOfBytes) << " -- " << (int)(*((uint8_t*)L1_metadata + L1_BLOOM_FILTER_SIZE + 32 + L1_index_2 + 128)) << std::endl;
 				std::memcpy((char*)L2_buffer + currentIndexL2 * column->data->numberOfBytes, (char*)L1_2_buffer + currentIndex_L1_2 * column->data->numberOfBytes, column->data->numberOfBytes);
 				uint16_t offset = *((uint8_t*)L1_metadata + L1_BLOOM_FILTER_SIZE + 32 + L1_index_2 + 128);
 				std::memcpy((char*)metadata + L2_BLOOM_FILTER_SIZE + 48 + wroteValues * 2, &offset, 2);
@@ -900,8 +929,9 @@ void BufferManager::StoreLevel2(Table* table) {
 				L1_index_2++;
 			}
 			else {
+				std::cout << "L2 " << *(int*)((char*)l2_data + L2_index * column->data->numberOfBytes) << " -- " << (int)(*((uint8_t*)l2_data + column->data->numberOfBytes * 128 + L2_index) + 128 + 128) << std::endl;
 				std::memcpy((char*)L2_buffer + currentIndexL2 * column->data->numberOfBytes, (char*)l2_data + L2_index * column->data->numberOfBytes, column->data->numberOfBytes);
-				uint16_t offset = *((uint8_t*)L1_metadata + L1_BLOOM_FILTER_SIZE + 32 + L1_index_2) + 128 + 128;
+				uint16_t offset = *((uint8_t*)l2_data + column->data->numberOfBytes * 128 + L2_index) + 128 + 128;
 				std::memcpy((char*)metadata + L2_BLOOM_FILTER_SIZE + 48 + wroteValues * 2, &offset, 2);
 				BitwiseHandler::setBit((uint8_t*)metadata + 720, wroteValues);
 				currentIndexL2++;
@@ -945,12 +975,17 @@ void BufferManager::StoreLevel2(Table* table) {
 				);
 			}
 			//write the L2_buffer in disk
-			if (currentIndexL2 == valuesPerBuffer || wroteValues == 3 * 128) {
+			if (currentIndexL2 == totalValuesPerBuffer || wroteValues == 3 * 128) {
+				int valuesToWrite = 0;
+				if (totalValuesPerBuffer > 3 * 128)
+					valuesToWrite = 3 * 128;
+				else
+					valuesToWrite = totalValuesPerBuffer;
 				SetFilePointer(L2_register_handle, offset, 0, NULL);
 				WriteFile(
 					L2_register_handle,
 					L2_buffer,
-					valuesPerBuffer* column->data->numberOfBytes,
+					valuesToWrite * column->data->numberOfBytes,
 					&bytes,
 					NULL
 				);
@@ -959,49 +994,6 @@ void BufferManager::StoreLevel2(Table* table) {
 			}
 
 
-
-
-
-			//if(L1_index < 128 * 2 && L2_index < 128){
-			//	int res = VoidMemoryHandler::COMPARE((char*)L1_buffer + (L1_index % valuesPerBuffer) * column->data->numberOfBytes, (char*)l2_temp + L2_index * column->data->numberOfBytes, column->data->dataType);
-			//	if (res == LESS) {
-			//		std::memcpy((char*)L2_buffer + buffer_index * column->data->numberOfBytes, (char*)L1_buffer + (L1_index % valuesPerBuffer) * column->data->numberOfBytes, column->data->numberOfBytes);
-			//		std::memcpy((char*)metadata + 720 + 48 + wroteValues * 2 + 1, (char*)L1_metadata + 512 + 32 + l1_offset, 1);
-			//		L1_index++;
-			//	}
-			//	else {
-			//		std::memcpy((char*)L2_buffer + buffer_index * column->data->numberOfBytes, (char*)l2_temp + L2_index * column->data->numberOfBytes, column->data->numberOfBytes);
-			//		uint16_t temp = *((char*)l2_temp + column->data->numberOfBytes * 128 + L2_index);
-			//		temp += 128 * 2;
-			//		std::memcpy((char*)metadata + 720 + 48 + wroteValues * 2, &temp, 2);
-			//		L2_index++;
-			//	}
-			//}else if(L1_index < 128 * 2){
-			//	std::memcpy((char*)L2_buffer + buffer_index * column->data->numberOfBytes, (char*)L1_buffer + (L1_index % valuesPerBuffer) * column->data->numberOfBytes, column->data->numberOfBytes);
-			//	std::memcpy((char*)metadata + 720 + 48 + wroteValues * 2 + 1, (char*)L1_metadata + 512 + 32 + l1_offset, 1);
-			//	L1_index++;
-			//}
-			//else {
-			//	std::memcpy((char*)L2_buffer + buffer_index * column->data->numberOfBytes, (char*)l2_temp + L2_index * column->data->numberOfBytes, column->data->numberOfBytes);
-			//	uint16_t temp = *((char*)l2_temp + column->data->numberOfBytes * 128 + L2_index);
-			//	temp += 128 * 2;
-			//	std::memcpy((char*)metadata + 720 + 48 + wroteValues * 2, &temp, 2);
-			//	L2_index++;
-			//}
-
-			//wroteValues++;
-			//if (offset == valuesPerBuffer - 1 && L1_index < 128 * 2) {
-			//	SetFilePointer(L2_register_handle, l1_offset, 0, NULL);
-			//	ReadFile(
-			//		L1_register_handle,
-			//		L1_buffer,
-			//		valuesPerBuffer* table->rowSize,
-			//		&bytes,
-			//		NULL
-			//	);
-			//	offset += BUFFER_SIZE;
-			//}
-			//if(L2_index )
 		}
 		SetFilePointer(L2_register_handle, metadataOffest, 0, NULL);
 		WriteFile(
@@ -1026,4 +1018,6 @@ void BufferManager::StoreLevel2(Table* table) {
 
 		};
 	table->columns.IterateWithCallback(storeColumn);
+	if(increaseL2Registers)
+		table->L2_registers++;
 };
