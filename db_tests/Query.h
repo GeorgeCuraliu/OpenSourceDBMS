@@ -16,9 +16,12 @@ public:
 
 	std::vector<int> L0_results;
 	std::vector<int> L1_results;
-	std::vector<int> L2_results;
+	//stores the register where were found matches
+	std::vector<int> L2_results_registers;
+	//L2_result_offsets stores just the offset of matches found in a register
+	std::vector<std::vector<int>> L2_results_offsets;
 
-	QueryData() :next(nullptr), L0_results(std::vector<int>()), L1_results(std::vector<int>()), L2_results(std::vector<int>()) {};
+	QueryData() :next(nullptr), L0_results(std::vector<int>()), L1_results(std::vector<int>()), L2_results_registers(std::vector<int>()) {};
 	
 
 };
@@ -112,7 +115,7 @@ public:
 			while (cursor != nullptr) {
 				OperationAND(currentData->L0_results, cursor->L0_results);
 				OperationAND(currentData->L1_results, cursor->L1_results);
-				OperationAND(currentData->L2_results, cursor->L2_results);
+				//OperationAND(currentData->L2_results, cursor->L2_results);
 				QueryData* oldCursor = cursor;
 				cursor = cursor->next;
 				delete oldCursor;
@@ -123,7 +126,7 @@ public:
 			while (cursor != nullptr) {
 				OperationOR(currentData->L0_results, cursor->L0_results);
 				OperationOR(currentData->L1_results, cursor->L1_results);
-				OperationOR(currentData->L2_results, cursor->L2_results);
+				//OperationOR(currentData->L2_results, cursor->L2_results);
 				QueryData* oldCursor = cursor;
 				cursor = cursor->next;
 				delete oldCursor;

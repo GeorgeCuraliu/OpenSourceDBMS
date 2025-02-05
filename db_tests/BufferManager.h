@@ -19,4 +19,5 @@ public:
 	static void SearchLevel1(Table* table, Column* column, void* values[], int argumentsNumber, std::vector<int>& foundValues, int comparator);
 	static void DeleteValuesLevel1(Table* table, std::vector<int>& deleteValues);
 	static void StoreLevel2(Table* table);
+	static void SearchLevel2(Table* table, Column* column, void* values[], int argumentsNumber, std::vector<int>& foundRegisters, std::vector<std::vector<int>>& foundOffsets, int comparator);
 };

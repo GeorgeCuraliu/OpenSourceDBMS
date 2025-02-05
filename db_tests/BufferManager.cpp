@@ -1021,3 +1021,10 @@ void BufferManager::StoreLevel2(Table* table) {
 	if(increaseL2Registers)
 		table->L2_registers++;
 };
+
+
+
+
+void BufferManager::SearchLevel2(Table* table, Column* column, void* values[], int argumentsNumber, std::vector<int>& foundRegisters, std::vector<std::vector<int>>& foundOffsets, int comparator){
+
+}
