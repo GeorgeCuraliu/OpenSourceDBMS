@@ -1138,7 +1138,7 @@ void BufferManager::SearchLevel2(Table* table, Column* column, void* values[], i
 					);
 
 					for (int k = 0; k < argumentsNumber; k++) {
-						int res = VoidMemoryHandler::COMPARE((uint8_t*)buffer + (remainingValues - 1) * column->data->numberOfBytes, values[k], column->data->dataType);
+						int res = VoidMemoryHandler::COMPARE(((uint8_t*)buffer + (remainingValues - 1) * column->data->numberOfBytes), values[k], column->data->dataType);
 						if (res & BIGGER) {
 							preCheck = true;
 							checkInOrder = false;
@@ -1151,7 +1151,9 @@ void BufferManager::SearchLevel2(Table* table, Column* column, void* values[], i
 
 
 				if (preCheck) {
+					bool stop = false;
 					if (checkInOrder) {
+
 						SetFilePointer(L2_register_handle, currentRegisterOffset, 0, NULL);
 						ReadFile(
 							L2_register_handle,
@@ -1164,12 +1166,12 @@ void BufferManager::SearchLevel2(Table* table, Column* column, void* values[], i
 						int totalValuesPerBuffer = floor(BUFFER_SIZE / column->data->numberOfBytes);
 						if (totalValuesPerBuffer > 3 * 128) totalValuesPerBuffer = 3 * 128;
 
-						for (int value = 0; value < 3 * 128; value++) {
+						for (int value = 0; value < 3 * 128 && !stop; value++) {
 							if (BitwiseHandler::checkBit((uint8_t*)metadata + 720, value)) {
 								for (int param = 0; param < argumentsNumber; param++) {
 									int res = VoidMemoryHandler::COMPARE((uint8_t*)buffer + (value % totalValuesPerBuffer) * column->data->numberOfBytes, values[param], column->data->dataType);
 									//if the comparator has both bigger and less, just continue
-									if (!(comparator & res) && (comparator & (LESS | BIGGER)) != (LESS | BIGGER)) return;
+									if (!(comparator & res) && (comparator & (LESS | BIGGER)) != (LESS | BIGGER)) stop = true;
 
 									if (comparator & res) {
 										int offset = *(uint16_t*)((uint8_t*)metadata + 720 + 48 + value * 2);
@@ -1213,14 +1215,52 @@ void BufferManager::SearchLevel2(Table* table, Column* column, void* values[], i
 							NULL
 						);
 
-						for (int value = 3 * 128; value > 0; value++) {
+						for (int value = 3 * 128; value > 0 && !stop; value--) {
 
+							if (BitwiseHandler::checkBit((uint8_t*)metadata + 720, value)) {
+								for (int param = 0; param < argumentsNumber; param++) {
+									int res = VoidMemoryHandler::COMPARE((uint8_t*)buffer + remainingValues * column->data->numberOfBytes, values[param], column->data->dataType);
+									//if the comparator has both bigger and less, just continue
+									if (!(comparator & res) && (comparator & (LESS | BIGGER)) != (LESS | BIGGER)) stop = true;
+
+									if (comparator & res) {
+										int offset = *(uint16_t*)((uint8_t*)metadata + 720 + 48 + value * 2);
+										int registerIndex = i * 4096 + j;
+										if (foundRegisters.size() == 0 || foundRegisters.back() != registerIndex) {
+											foundRegisters.push_back(registerIndex);
+											foundOffsets.push_back(std::vector<int>());
+										}
+										foundOffsets.back().push_back(offset);
+									}
+								}
+							}
+
+							remainingValues--;
+							if (remainingValues == 0) {
+								currentRegisterOffset -= BUFFER_SIZE;
+								SetFilePointer(L2_register_handle, currentRegisterOffset, 0, NULL);
+								ReadFile(
+									L2_register_handle,
+									buffer,
+									BUFFER_SIZE,
+									&bytes,
+									NULL
+								);
+								remainingValues = totalValuesPerBuffer;
+							}
 						}
 
 
 					}
 				}
 			}
+
+			L2Offset = GetL2Size(i * 4096 + j + 1, column->data->numberOfBytes, L2_METADATA_SIZE);
+			currentRegisterOffset = L2Offset;
 		}
 	}
+	CloseHandle(L2_register_handle);
+	free(metadata);
+	free(registerTombstones);
+	free(buffer);
 }
