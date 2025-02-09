@@ -494,6 +494,8 @@ long long BufferManager::GetL2FreeRegister(long long registerNumber, int valueSi
 		for(int j = 0; j < 512 * 8; j++)
 			if (!BitwiseHandler::checkBit((uint8_t*)tombstones, j)) {
 				BitwiseHandler::setBit((uint8_t*)tombstones, j);
+				int a = *(int*)tombstones;
+				SetFilePointer(fileHandle, offset, 0, NULL);
 				WriteFile(
 					fileHandle,
 					tombstones,
@@ -533,7 +535,7 @@ void BufferManager::StoreLevel2(Table* table) {
 	fileName2[0] = '2';
 	fileName2[1] = '_';
 	std::memcpy(fileName2 + 2, table->name, sizeof(table->name));
-	bool increaseL2Registers = false;
+	//bool increaseL2Registers = false;
 
 	HANDLE L2_register_handle = CreateFileA(
 		(LPCSTR)(fileName2),
@@ -549,9 +551,10 @@ void BufferManager::StoreLevel2(Table* table) {
 
 	long long registerIndex = GetL2FreeRegister(table->L2_registers, table->rowSize, L2_register_handle, SEGMENT_SIZE);
 	long long offset;
+	bool increasedL2Registers = false;
 	if (registerIndex < 0) {
 		offset = GetL2Offset(table->L2_registers, table->rowSize, SEGMENT_SIZE);
-		increaseL2Registers = true;
+		increasedL2Registers = true;
 	}
 		
 	else
@@ -687,7 +690,7 @@ void BufferManager::StoreLevel2(Table* table) {
 	free(fileName2);
 
 
-	auto storeColumn = [table, registerIndex](Column* column) {
+	auto storeColumn = [table](Column* column) {
 		size_t tableNameLen = std::strlen(table->name);
 		size_t columnNameLen = std::strlen(column->name);
 		char* fileName2 = (char*)calloc(tableNameLen + columnNameLen + 4, sizeof(char)); // +1 for null terminator
@@ -735,14 +738,14 @@ void BufferManager::StoreLevel2(Table* table) {
 		);
 
 
-		//long long registerIndex = GetL2FreeRegister(table->L2_registers, column->data->numberOfBytes, L2_register_handle, L2_METADATA_SIZE);
+		long long registerIndex = GetL2FreeRegister(table->L2_registers, column->data->numberOfBytes, L2_register_handle, L2_METADATA_SIZE);
 		long long offset;
 		if (registerIndex < 0)
 			offset = GetL2Offset(table->L2_registers, column->data->numberOfBytes, L2_METADATA_SIZE);
 		else
 			offset = GetL2Offset(registerIndex, column->data->numberOfBytes, L2_METADATA_SIZE);
 		long long metadataOffest = offset;
-		offset += L2_METADATA_SIZE;
+
 
 		SetFilePointer(L2_register_handle, offset, 0, NULL);
 
@@ -766,7 +769,7 @@ void BufferManager::StoreLevel2(Table* table) {
 			std::cout << "wrote " << wroteBytes << " bytes out of 512 -- RegisterTombstones" << std::endl;
 			free(tombstones);
 		}
-
+		offset += L2_METADATA_SIZE;
 
 		SetFilePointer(L2_register_handle, offset, 0, NULL);
 		SetFilePointer(L1_register_handle, 0, 0, NULL);
@@ -1018,7 +1021,7 @@ void BufferManager::StoreLevel2(Table* table) {
 
 		};
 	table->columns.IterateWithCallback(storeColumn);
-	if(increaseL2Registers)
+	if(increasedL2Registers)
 		table->L2_registers++;
 };
 
@@ -1027,4 +1030,197 @@ void BufferManager::StoreLevel2(Table* table) {
 
 void BufferManager::SearchLevel2(Table* table, Column* column, void* values[], int argumentsNumber, std::vector<int>& foundRegisters, std::vector<std::vector<int>>& foundOffsets, int comparator){
 
+	size_t tableNameLen = std::strlen(table->name);
+	size_t columnNameLen = std::strlen(column->name);
+	char* fileName2 = (char*)calloc(tableNameLen + columnNameLen + 4, sizeof(char)); // +1 for null terminator
+	if (!fileName2) {
+		std::cerr << "Memory allocation failed!" << std::endl;
+		return;  // Handle allocation failure
+	}
+
+	fileName2[0] = '2';
+	fileName2[1] = '_';
+	std::memcpy(fileName2 + 2, table->name, tableNameLen);
+	fileName2[tableNameLen + 2] = '&';
+	std::memcpy(fileName2 + tableNameLen + 3, column->name, columnNameLen);
+	fileName2[tableNameLen + columnNameLen + 3] = '\0';
+
+	HANDLE L2_register_handle = CreateFileA(
+		(LPCSTR)(fileName2),
+		GENERIC_ALL,
+		FILE_SHARE_WRITE,
+		NULL,
+		OPEN_ALWAYS,
+		FILE_ATTRIBUTE_NORMAL,
+		NULL
+	);
+
+
+	int numberOfRegisterTombstones = ceil(float(table->L2_registers) / 4096);
+	int L2Offset = 0;
+	//offset inside the selected register
+	int currentRegisterOffset = 0;
+	void* registerTombstones = malloc(512);
+	void* metadata = malloc(L2_METADATA_SIZE);
+	void* buffer = malloc(BUFFER_SIZE);
+	DWORD bytes;
+	
+	for (int i = 0; i < numberOfRegisterTombstones; i++) {
+		SetFilePointer(L2_register_handle, L2Offset, 0, NULL);
+		ReadFile(
+			L2_register_handle,
+			registerTombstones,
+			512,
+			&bytes,
+			NULL
+		);
+		L2Offset += 512;
+		int a = *(int*)registerTombstones;
+		for (int j = 0; j < 4096; j++) {
+			if (BitwiseHandler::checkBit((uint8_t*)registerTombstones, j)) {
+				SetFilePointer(L2_register_handle, L2Offset, 0, NULL);
+				ReadFile(
+					L2_register_handle,
+					metadata,
+					L2_METADATA_SIZE,
+					&bytes,
+					NULL
+				);
+				bool preCheck = false;
+				bool checkInOrder = true;
+				bool orderChoosed = false;
+				currentRegisterOffset = L2Offset + 512 * 3;
+				if (comparator & EQUALS) {
+
+					for (int k = 0; k < argumentsNumber; k++)
+						if (BloomFilter::CheckValue(metadata, values[k], column->data->numberOfBytes, L2_BLOOM_FILTER_SIZE)) 
+							preCheck = true;
+					
+				}
+				if (comparator & LESS && !orderChoosed) {
+					SetFilePointer(L2_register_handle, currentRegisterOffset, 0, NULL);
+					ReadFile(
+						L2_register_handle,
+						buffer,
+						BUFFER_SIZE,
+						&bytes,
+						NULL
+					);
+					for (int k = 0; k < argumentsNumber; k++) {
+						int res = VoidMemoryHandler::COMPARE(buffer, values[k], column->data->dataType);
+						if (res & LESS) {
+							preCheck = true;
+							orderChoosed = true;
+							checkInOrder = true;
+						}
+
+					}
+						
+						
+				}
+				if (comparator & BIGGER && !orderChoosed) {
+					//remaining values in the last buffer
+					int totalValuesPerBuffer = floor(BUFFER_SIZE / column->data->numberOfBytes);
+					if (totalValuesPerBuffer > 3 * 128) totalValuesPerBuffer = 3 * 128;
+					int remainingValues = 3 * 128 % totalValuesPerBuffer;
+					if (remainingValues == 0) remainingValues = totalValuesPerBuffer;
+
+					int numberOfBuffers = ceil(float(3 * 128) / totalValuesPerBuffer);
+					currentRegisterOffset += (numberOfBuffers - 1) * BUFFER_SIZE;
+
+					SetFilePointer(L2_register_handle, currentRegisterOffset, 0, NULL);
+					ReadFile(
+						L2_register_handle,
+						buffer,
+						remainingValues * column->data->numberOfBytes,
+						&bytes,
+						NULL
+					);
+
+					for (int k = 0; k < argumentsNumber; k++) {
+						int res = VoidMemoryHandler::COMPARE((uint8_t*)buffer + (remainingValues - 1) * column->data->numberOfBytes, values[k], column->data->dataType);
+						if (res & BIGGER) {
+							preCheck = true;
+							checkInOrder = false;
+							orderChoosed = true;
+						}
+							
+					}
+				}
+
+
+
+				if (preCheck) {
+					if (checkInOrder) {
+						SetFilePointer(L2_register_handle, currentRegisterOffset, 0, NULL);
+						ReadFile(
+							L2_register_handle,
+							buffer,
+							BUFFER_SIZE,
+							&bytes,
+							NULL
+						);
+
+						int totalValuesPerBuffer = floor(BUFFER_SIZE / column->data->numberOfBytes);
+						if (totalValuesPerBuffer > 3 * 128) totalValuesPerBuffer = 3 * 128;
+
+						for (int value = 0; value < 3 * 128; value++) {
+							if (BitwiseHandler::checkBit((uint8_t*)metadata + 720, value)) {
+								for (int param = 0; param < argumentsNumber; param++) {
+									int res = VoidMemoryHandler::COMPARE((uint8_t*)buffer + (value % totalValuesPerBuffer) * column->data->numberOfBytes, values[param], column->data->dataType);
+									//if the comparator has both bigger and less, just continue
+									if (!(comparator & res) && (comparator & (LESS | BIGGER)) != (LESS | BIGGER)) return;
+
+									if (comparator & res) {
+										int offset = *(uint16_t*)((uint8_t*)metadata + 720 + 48 + value * 2);
+										int registerIndex = i * 4096 + j;
+										if (foundRegisters.size() == 0 || foundRegisters.back() != registerIndex) {
+											foundRegisters.push_back(registerIndex);
+											foundOffsets.push_back(std::vector<int>());
+										}
+										foundOffsets.back().push_back(offset);
+									}
+								}
+							}
+							if (value != 0 && value % totalValuesPerBuffer == 0) {
+								currentRegisterOffset += BUFFER_SIZE;
+								SetFilePointer(L2_register_handle, currentRegisterOffset, 0, NULL);
+								ReadFile(
+									L2_register_handle,
+									buffer,
+									BUFFER_SIZE,
+									&bytes,
+									NULL
+								);
+							}
+						}
+					}
+					else {
+						int totalValuesPerBuffer = floor(BUFFER_SIZE / column->data->numberOfBytes);
+						if (totalValuesPerBuffer > 3 * 128) totalValuesPerBuffer = 3 * 128;
+						int remainingValues = 3 * 128 % totalValuesPerBuffer;
+						if (remainingValues == 0) remainingValues = totalValuesPerBuffer;
+
+						int numberOfBuffers = ceil(float(3 * 128) / totalValuesPerBuffer);
+						currentRegisterOffset += (numberOfBuffers - 1) * BUFFER_SIZE;
+
+						SetFilePointer(L2_register_handle, currentRegisterOffset, 0, NULL);
+						ReadFile(
+							L2_register_handle,
+							buffer,
+							remainingValues* column->data->numberOfBytes,
+							&bytes,
+							NULL
+						);
+
+						for (int value = 3 * 128; value > 0; value++) {
+
+						}
+
+
+					}
+				}
+			}
+		}
+	}
 }

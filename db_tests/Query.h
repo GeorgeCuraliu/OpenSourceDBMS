@@ -92,6 +92,9 @@ public:
 				if (table->L1_registers != 0) {
 					BufferManager::SearchLevel1(table, currentColumn, values, argumentsNumber, foundData->L1_results, comparator);
 				}
+				if (table->L2_registers != 0) {
+					BufferManager::SearchLevel2(table, currentColumn, values, argumentsNumber, foundData->L2_results_registers, foundData->L2_results_offsets, comparator);
+				}
 				std::cout << foundData->L0_results.size() << " aw" << std::endl;
 				for (int i = 0; i < foundData->L0_results.size(); i++) {
 					std::cout << foundData->L0_results.at(i) << std::endl;

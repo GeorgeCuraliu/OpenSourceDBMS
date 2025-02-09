@@ -110,6 +110,7 @@ void Table::FlushData() {
 		L1_registers++;
 	}
 	else {
+		bool increasedL2Registers = false;
 		BufferManager::StoreLevel2(this);
 		L1_registers = 0;
 	}
