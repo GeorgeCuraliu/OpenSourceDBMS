@@ -3,12 +3,20 @@
   "WorkspaceRootPath": "I:\\C\u002B\u002B\\OpenSourceDBMS\\",
   "Documents": [
     {
-      "AbsoluteMoniker": "D:0:0:{409C5BDD-4848-4357-9435-AD9DFDCB971D}|db_tests\\db_tests.vcxproj|I:\\C\u002B\u002B\\OpenSourceDBMS\\db_tests\\BufferManager.cpp||{D0E1A5C6-B359-4E41-9B60-3365922C2A22}",
-      "RelativeMoniker": "D:0:0:{409C5BDD-4848-4357-9435-AD9DFDCB971D}|db_tests\\db_tests.vcxproj|solutionrelative:db_tests\\BufferManager.cpp||{D0E1A5C6-B359-4E41-9B60-3365922C2A22}"
+      "AbsoluteMoniker": "D:0:0:{409C5BDD-4848-4357-9435-AD9DFDCB971D}|db_tests\\db_tests.vcxproj|I:\\C\u002B\u002B\\OpenSourceDBMS\\db_tests\\Query.h||{D0E1A5C6-B359-4E41-9B60-3365922C2A22}",
+      "RelativeMoniker": "D:0:0:{409C5BDD-4848-4357-9435-AD9DFDCB971D}|db_tests\\db_tests.vcxproj|solutionrelative:db_tests\\Query.h||{D0E1A5C6-B359-4E41-9B60-3365922C2A22}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{409C5BDD-4848-4357-9435-AD9DFDCB971D}|db_tests\\db_tests.vcxproj|I:\\C\u002B\u002B\\OpenSourceDBMS\\db_tests\\Parameters.h||{D0E1A5C6-B359-4E41-9B60-3365922C2A22}",
+      "RelativeMoniker": "D:0:0:{409C5BDD-4848-4357-9435-AD9DFDCB971D}|db_tests\\db_tests.vcxproj|solutionrelative:db_tests\\Parameters.h||{D0E1A5C6-B359-4E41-9B60-3365922C2A22}"
     },
     {
       "AbsoluteMoniker": "D:0:0:{409C5BDD-4848-4357-9435-AD9DFDCB971D}|db_tests\\db_tests.vcxproj|I:\\C\u002B\u002B\\OpenSourceDBMS\\db_tests\\lsm_tree.cpp||{D0E1A5C6-B359-4E41-9B60-3365922C2A22}",
       "RelativeMoniker": "D:0:0:{409C5BDD-4848-4357-9435-AD9DFDCB971D}|db_tests\\db_tests.vcxproj|solutionrelative:db_tests\\lsm_tree.cpp||{D0E1A5C6-B359-4E41-9B60-3365922C2A22}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{409C5BDD-4848-4357-9435-AD9DFDCB971D}|db_tests\\db_tests.vcxproj|I:\\C\u002B\u002B\\OpenSourceDBMS\\db_tests\\BufferManager.cpp||{D0E1A5C6-B359-4E41-9B60-3365922C2A22}",
+      "RelativeMoniker": "D:0:0:{409C5BDD-4848-4357-9435-AD9DFDCB971D}|db_tests\\db_tests.vcxproj|solutionrelative:db_tests\\BufferManager.cpp||{D0E1A5C6-B359-4E41-9B60-3365922C2A22}"
     },
     {
       "AbsoluteMoniker": "D:0:0:{409C5BDD-4848-4357-9435-AD9DFDCB971D}|db_tests\\db_tests.vcxproj|I:\\C\u002B\u002B\\OpenSourceDBMS\\db_tests\\VoidMemoryHandler.h||{D0E1A5C6-B359-4E41-9B60-3365922C2A22}",
@@ -23,16 +31,8 @@
       "RelativeMoniker": "D:0:0:{409C5BDD-4848-4357-9435-AD9DFDCB971D}|db_tests\\db_tests.vcxproj|solutionrelative:db_tests\\Table.cpp||{D0E1A5C6-B359-4E41-9B60-3365922C2A22}"
     },
     {
-      "AbsoluteMoniker": "D:0:0:{409C5BDD-4848-4357-9435-AD9DFDCB971D}|db_tests\\db_tests.vcxproj|I:\\C\u002B\u002B\\OpenSourceDBMS\\db_tests\\Query.h||{D0E1A5C6-B359-4E41-9B60-3365922C2A22}",
-      "RelativeMoniker": "D:0:0:{409C5BDD-4848-4357-9435-AD9DFDCB971D}|db_tests\\db_tests.vcxproj|solutionrelative:db_tests\\Query.h||{D0E1A5C6-B359-4E41-9B60-3365922C2A22}"
-    },
-    {
       "AbsoluteMoniker": "D:0:0:{409C5BDD-4848-4357-9435-AD9DFDCB971D}|db_tests\\db_tests.vcxproj|I:\\C\u002B\u002B\\OpenSourceDBMS\\db_tests\\FileData.h||{D0E1A5C6-B359-4E41-9B60-3365922C2A22}",
       "RelativeMoniker": "D:0:0:{409C5BDD-4848-4357-9435-AD9DFDCB971D}|db_tests\\db_tests.vcxproj|solutionrelative:db_tests\\FileData.h||{D0E1A5C6-B359-4E41-9B60-3365922C2A22}"
-    },
-    {
-      "AbsoluteMoniker": "D:0:0:{409C5BDD-4848-4357-9435-AD9DFDCB971D}|db_tests\\db_tests.vcxproj|I:\\C\u002B\u002B\\OpenSourceDBMS\\db_tests\\Parameters.h||{D0E1A5C6-B359-4E41-9B60-3365922C2A22}",
-      "RelativeMoniker": "D:0:0:{409C5BDD-4848-4357-9435-AD9DFDCB971D}|db_tests\\db_tests.vcxproj|solutionrelative:db_tests\\Parameters.h||{D0E1A5C6-B359-4E41-9B60-3365922C2A22}"
     },
     {
       "AbsoluteMoniker": "D:0:0:{409C5BDD-4848-4357-9435-AD9DFDCB971D}|db_tests\\db_tests.vcxproj|I:\\C\u002B\u002B\\OpenSourceDBMS\\db_tests\\Table.h||{D0E1A5C6-B359-4E41-9B60-3365922C2A22}",
@@ -62,11 +62,11 @@
       "DocumentGroups": [
         {
           "DockedHeight": 200,
-          "SelectedChildIndex": 2,
+          "SelectedChildIndex": 6,
           "Children": [
             {
               "$type": "Document",
-              "DocumentIndex": 7,
+              "DocumentIndex": 1,
               "Title": "Parameters.h",
               "DocumentMoniker": "I:\\C\u002B\u002B\\OpenSourceDBMS\\db_tests\\Parameters.h",
               "RelativeDocumentMoniker": "db_tests\\Parameters.h",
@@ -74,11 +74,12 @@
               "RelativeToolTip": "db_tests\\Parameters.h",
               "ViewState": "AgIAAAAAAAAAAAAAAAAAAA4AAAAUAAAAAAAAAA==",
               "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000680|",
-              "WhenOpened": "2025-01-22T21:06:33.556Z"
+              "WhenOpened": "2025-01-22T21:06:33.556Z",
+              "EditorCaption": ""
             },
             {
               "$type": "Document",
-              "DocumentIndex": 6,
+              "DocumentIndex": 7,
               "Title": "FileData.h",
               "DocumentMoniker": "I:\\C\u002B\u002B\\OpenSourceDBMS\\db_tests\\FileData.h",
               "RelativeDocumentMoniker": "db_tests\\FileData.h",
@@ -90,28 +91,29 @@
             },
             {
               "$type": "Document",
-              "DocumentIndex": 0,
+              "DocumentIndex": 3,
               "Title": "BufferManager.cpp",
               "DocumentMoniker": "I:\\C\u002B\u002B\\OpenSourceDBMS\\db_tests\\BufferManager.cpp",
               "RelativeDocumentMoniker": "db_tests\\BufferManager.cpp",
               "ToolTip": "I:\\C\u002B\u002B\\OpenSourceDBMS\\db_tests\\BufferManager.cpp",
               "RelativeToolTip": "db_tests\\BufferManager.cpp",
-              "ViewState": "AgIAAPkDAAAAAAAAAADwvzcEAAAAAAAAAAAAAA==",
+              "ViewState": "AgIAAIUEAAAAAAAAAAAewNAEAAAAAAAAAAAAAA==",
               "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000677|",
               "WhenOpened": "2024-10-21T21:30:28.843Z",
               "EditorCaption": ""
             },
             {
               "$type": "Document",
-              "DocumentIndex": 3,
+              "DocumentIndex": 5,
               "Title": "BufferManager.h",
               "DocumentMoniker": "I:\\C\u002B\u002B\\OpenSourceDBMS\\db_tests\\BufferManager.h",
               "RelativeDocumentMoniker": "db_tests\\BufferManager.h",
               "ToolTip": "I:\\C\u002B\u002B\\OpenSourceDBMS\\db_tests\\BufferManager.h",
               "RelativeToolTip": "db_tests\\BufferManager.h",
-              "ViewState": "AgIAAAAAAAAAAAAAAAAAABQAAAAlAAAAAAAAAA==",
+              "ViewState": "AgIAAAAAAAAAAAAAAAAAAAwAAAAiAAAAAAAAAA==",
               "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000680|",
-              "WhenOpened": "2024-10-21T06:54:23.443Z"
+              "WhenOpened": "2024-10-21T06:54:23.443Z",
+              "EditorCaption": ""
             },
             {
               "$type": "Document",
@@ -139,15 +141,16 @@
             },
             {
               "$type": "Document",
-              "DocumentIndex": 5,
+              "DocumentIndex": 0,
               "Title": "Query.h",
               "DocumentMoniker": "I:\\C\u002B\u002B\\OpenSourceDBMS\\db_tests\\Query.h",
               "RelativeDocumentMoniker": "db_tests\\Query.h",
               "ToolTip": "I:\\C\u002B\u002B\\OpenSourceDBMS\\db_tests\\Query.h",
               "RelativeToolTip": "db_tests\\Query.h",
-              "ViewState": "AgIAAEUAAAAAAAAAAAAAAF8AAACcAAAAAAAAAA==",
+              "ViewState": "AgIAAI4AAAAAAAAAAADwv6IAAAAAAAAAAAAAAA==",
               "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000680|",
-              "WhenOpened": "2024-10-21T08:52:44.651Z"
+              "WhenOpened": "2024-10-21T08:52:44.651Z",
+              "EditorCaption": ""
             },
             {
               "$type": "Document",
@@ -163,7 +166,7 @@
             },
             {
               "$type": "Document",
-              "DocumentIndex": 4,
+              "DocumentIndex": 6,
               "Title": "Table.cpp",
               "DocumentMoniker": "I:\\C\u002B\u002B\\OpenSourceDBMS\\db_tests\\Table.cpp",
               "RelativeDocumentMoniker": "db_tests\\Table.cpp",
@@ -187,7 +190,7 @@
             },
             {
               "$type": "Document",
-              "DocumentIndex": 2,
+              "DocumentIndex": 4,
               "Title": "VoidMemoryHandler.h",
               "DocumentMoniker": "I:\\C\u002B\u002B\\OpenSourceDBMS\\db_tests\\VoidMemoryHandler.h",
               "RelativeDocumentMoniker": "db_tests\\VoidMemoryHandler.h",
@@ -200,13 +203,13 @@
             },
             {
               "$type": "Document",
-              "DocumentIndex": 1,
+              "DocumentIndex": 2,
               "Title": "lsm_tree.cpp",
               "DocumentMoniker": "I:\\C\u002B\u002B\\OpenSourceDBMS\\db_tests\\lsm_tree.cpp",
               "RelativeDocumentMoniker": "db_tests\\lsm_tree.cpp",
               "ToolTip": "I:\\C\u002B\u002B\\OpenSourceDBMS\\db_tests\\lsm_tree.cpp",
               "RelativeToolTip": "db_tests\\lsm_tree.cpp",
-              "ViewState": "AgIAANQAAAAAAAAAAAAQwPIAAAA2AAAAAAAAAA==",
+              "ViewState": "AgIAAMUAAAAAAAAAAAAewPcAAAATAAAAAAAAAA==",
               "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000677|",
               "WhenOpened": "2024-10-17T16:45:00.99Z",
               "EditorCaption": ""

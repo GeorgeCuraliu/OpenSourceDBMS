@@ -394,19 +394,19 @@ void BufferManager::DeleteValuesLevel1(Table* table, std::vector<int>& deleteVal
 		std::memcpy(fileName + tableNameLen + 1, column->name, columnNameLen);
 		fileName[tableNameLen + columnNameLen + 1] = '\0';
 
-		ClearTombstones(fileName, deleteValues, L1_BLOOM_FILTER_SIZE, table->L1_registers * 128, true);
+		ClearTombstonesLevel1(fileName, deleteValues, L1_BLOOM_FILTER_SIZE, table->L1_registers * 128, true);
 		
 		free(fileName);
 		};
 	table->columns.IterateWithCallback(deleteFromRegistry);
 
-	ClearTombstones(table->name, deleteValues, 0);
+	ClearTombstonesLevel1(table->name, deleteValues, 0);
 }
 
 
 //->search offsets is a optional parameter that will decide if the tombstones`s order is represented by some offsets or by their disk order
 //->number of values is used in case the offsets are determined by another order than the disk order and it is needed to know how much space too allocate for metadata
-void BufferManager::ClearTombstones(char* fileName, std::vector<int>& deleteValues, int tombstonesOffset, int numberOfValues, bool searchOffsets){
+void BufferManager::ClearTombstonesLevel1(char* fileName, std::vector<int>& deleteValues, int tombstonesOffset, int numberOfValues, bool searchOffsets){
 	HANDLE fileHandle = nullptr;
 	fileHandle = CreateFileA(
 		(LPCSTR)fileName,
@@ -1171,7 +1171,7 @@ void BufferManager::SearchLevel2(Table* table, Column* column, void* values[], i
 								for (int param = 0; param < argumentsNumber; param++) {
 									int res = VoidMemoryHandler::COMPARE((uint8_t*)buffer + (value % totalValuesPerBuffer) * column->data->numberOfBytes, values[param], column->data->dataType);
 									//if the comparator has both bigger and less, just continue
-									if (!(comparator & res) && (comparator & (LESS | BIGGER)) != (LESS | BIGGER)) stop = true;
+									if (!(comparator & res) && (comparator & (LESS | BIGGER)) != (LESS | BIGGER) && (comparator == EQUALS && res == BIGGER)) stop = true;
 
 									if (comparator & res) {
 										int offset = *(uint16_t*)((uint8_t*)metadata + 720 + 48 + value * 2);
@@ -1255,7 +1255,7 @@ void BufferManager::SearchLevel2(Table* table, Column* column, void* values[], i
 				}
 			}
 
-			L2Offset = GetL2Size(i * 4096 + j + 1, column->data->numberOfBytes, L2_METADATA_SIZE);
+			L2Offset = GetL2Offset(i * 4096 + j + 1, column->data->numberOfBytes, L2_METADATA_SIZE);
 			currentRegisterOffset = L2Offset;
 		}
 	}
@@ -1263,4 +1263,8 @@ void BufferManager::SearchLevel2(Table* table, Column* column, void* values[], i
 	free(metadata);
 	free(registerTombstones);
 	free(buffer);
+}
+
+void BufferManager::DeleteValuesLevel2(Table* table, std::vector<int>& registers, std::vector<std::vector<int>>& foundValues){
+
 }

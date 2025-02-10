@@ -119,6 +119,29 @@ public:
 				OperationAND(currentData->L0_results, cursor->L0_results);
 				OperationAND(currentData->L1_results, cursor->L1_results);
 				//OperationAND(currentData->L2_results, cursor->L2_results);
+
+				if (currentData->L2_results_registers.size() != 0) {
+					std::vector<std::vector<int>>::iterator it_0 = currentData->L2_results_offsets.begin();
+					for (std::vector<int>::iterator it_r0 = currentData->L2_results_registers.begin(); it_r0 != currentData->L2_results_registers.end();) {
+						bool check = false;
+						std::vector<std::vector<int>>::iterator it_1 = cursor->L2_results_offsets.begin();
+						for (std::vector<int>::iterator it_r1 = cursor->L2_results_registers.begin(); it_r1 != cursor->L2_results_registers.end() && !check; it_r1++, it_1++) {
+							if (*it_r1 == *it_r0) {
+								check = true;
+								OperationAND(*it_0, *it_1);
+							}
+						}
+						if (!check) {
+							it_r0 = currentData->L2_results_registers.erase(it_r0);
+							it_0 = currentData->L2_results_offsets.erase(it_0);
+						}
+						else {
+							it_r0++;
+							it_0++;
+						}
+					}
+				}
+
 				QueryData* oldCursor = cursor;
 				cursor = cursor->next;
 				delete oldCursor;
@@ -130,13 +153,46 @@ public:
 				OperationOR(currentData->L0_results, cursor->L0_results);
 				OperationOR(currentData->L1_results, cursor->L1_results);
 				//OperationOR(currentData->L2_results, cursor->L2_results);
+
+				if (currentData->L2_results_registers.size() != 0) {
+					std::vector<std::vector<int>>::iterator it_0 = currentData->L2_results_offsets.begin();
+					for (std::vector<int>::iterator it_r0 = currentData->L2_results_registers.begin(); it_r0 != currentData->L2_results_registers.end(); it_r0++, it_0++) {
+						bool check = false;
+						std::vector<std::vector<int>>::iterator it_1 = cursor->L2_results_offsets.begin();
+						std::vector<int>::iterator it_r1 = cursor->L2_results_registers.begin();
+						for (; it_r1 != cursor->L2_results_registers.end() && !check; it_r1++, it_1++) {
+							if (*it_r1 == *it_r0) {
+								check = true;
+								OperationOR(*it_0, *it_1);
+								/*	it_r1 = currentData->L2_results_registers.erase(it_r1);
+									it_1 = currentData->L2_results_offsets.erase(it_1);*/
+							}
+						}
+						if (!check) {
+							/*it_r0 = currentData->L2_results_registers.erase(it_r0);
+							it_0 = currentData->L2_results_offsets.erase(it_0);*/
+							currentData->L2_results_offsets.push_back(*it_1);
+							currentData->L2_results_registers.push_back(*it_r1);
+
+							cursor->L2_results_offsets.erase(it_1);
+							cursor->L2_results_registers.erase(it_r1);
+						}
+						else {
+							/*it_r0++;
+							it_0++;*/
+
+						}
+					}
+
+				}
+
 				QueryData* oldCursor = cursor;
 				cursor = cursor->next;
 				delete oldCursor;
 			}
+			currentData->next = nullptr;//all QueryData object were merged into this one, therefore there is no next QueryData
+			return this;
 		}
-		currentData->next = nullptr;//all QueryData object were merged into this one, therefore there is no next QueryData
-		return this;
 	}
 	//Delete() assumes that querriesResult has just one querryResult
 	Query* Delete() {
