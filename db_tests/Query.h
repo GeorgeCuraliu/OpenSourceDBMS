@@ -190,7 +190,8 @@ public:
 				cursor = cursor->next;
 				delete oldCursor;
 			}
-			currentData->next = nullptr;//all QueryData object were merged into this one, therefore there is no next QueryData
+			//all QueryData object were merged into this one, therefore there is no next QueryData
+			currentData->next = nullptr;
 			return this;
 		}
 	}
