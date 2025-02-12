@@ -1267,4 +1267,131 @@ void BufferManager::SearchLevel2(Table* table, Column* column, void* values[], i
 
 void BufferManager::DeleteValuesLevel2(Table* table, std::vector<int>& registers, std::vector<std::vector<int>>& foundValues){
 
+	char* fileName2 = (char*)calloc(sizeof(table->name) + 2, 1);
+	fileName2[0] = '2';
+	fileName2[1] = '_';
+	std::memcpy(fileName2 + 2, table->name, sizeof(table->name));
+	//bool increaseL2Registers = false;
+
+	HANDLE L2_register_handle = CreateFileA(
+		(LPCSTR)(fileName2),
+		GENERIC_ALL,
+		FILE_SHARE_READ | FILE_SHARE_WRITE,
+		NULL,
+		OPEN_ALWAYS,
+		FILE_ATTRIBUTE_NORMAL,
+		NULL
+	);
+
+	auto it = registers.begin();
+	auto it2 = foundValues.begin();
+	void* tombstones = malloc(3 * 16);
+	DWORD bytes;
+
+	for (; it != registers.end(); it++, it2++) {
+		long long offset = GetL2Offset(*it, table->rowSize, SEGMENT_SIZE);
+		if (*it % 4096 == 0)
+			offset += SEGMENT_SIZE;
+		std::vector<int>& a = *it2;
+		std::vector<int>::iterator it3= a.begin();
+
+		SetFilePointer(L2_register_handle, offset, 0, NULL);
+		ReadFile(
+			L2_register_handle,
+			tombstones,
+			3 * 16,
+			&bytes,
+			NULL
+		);
+
+		for (; it3 != a.end(); it3++) {
+			BitwiseHandler::clearBit((uint8_t*)tombstones, *it3);
+		}
+
+		SetFilePointer(L2_register_handle, offset, 0, NULL);
+		WriteFile(
+			L2_register_handle,
+			tombstones,
+			3 * 16,
+			&bytes,
+			NULL
+		);
+	}
+
+	CloseHandle(L2_register_handle);
+
+	auto deleteTombstones = [table, &foundValues, &registers](Column* column) {
+
+		size_t tableNameLen = std::strlen(table->name);
+		size_t columnNameLen = std::strlen(column->name);
+		char* fileName2 = (char*)calloc(tableNameLen + columnNameLen + 4, sizeof(char)); // +1 for null terminator
+		if (!fileName2) {
+			std::cerr << "Memory allocation failed!" << std::endl;
+			return -1;  // Handle allocation failure
+		}
+
+		fileName2[0] = '2';
+		fileName2[1] = '_';
+		std::memcpy(fileName2 + 2, table->name, tableNameLen);
+		fileName2[tableNameLen + 2] = '&';
+		std::memcpy(fileName2 + tableNameLen + 3, column->name, columnNameLen);
+		fileName2[tableNameLen + columnNameLen + 3] = '\0';
+
+		HANDLE L2_register_handle = CreateFileA(
+			(LPCSTR)(fileName2),
+			GENERIC_ALL,
+			FILE_SHARE_WRITE,
+			NULL,
+			OPEN_ALWAYS,
+			FILE_ATTRIBUTE_NORMAL,
+			NULL
+		);
+
+		auto it = registers.begin();
+		auto it2 = foundValues.begin();
+		void* metadata = malloc(L2_OFFSETS + 48);
+		DWORD bytes;
+		for (; it != registers.end(); it++, it2++) {
+			long long offset = GetL2Offset(*it, column->data->numberOfBytes, L2_METADATA_SIZE);
+			if (*it % 4096 == 0)
+				offset += SEGMENT_SIZE;
+			std::vector<int>& a = *it2;
+			std::vector<int>::iterator it3 = a.begin();
+
+			SetFilePointer(L2_register_handle, offset + L2_BLOOM_FILTER_SIZE, 0, NULL);
+			ReadFile(
+				L2_register_handle,
+				metadata,
+				L2_OFFSETS + 48,
+				&bytes,
+				NULL
+			);
+
+			for (int i = 0; i < 3 * 128; i++) {
+				uint16_t offset_r = *((uint16_t*)metadata + i + 24);
+				for (it3 = a.begin(); it3 != a.end(); it3++) {
+					if((int)offset_r == *it3)
+						BitwiseHandler::clearBit((uint8_t*)metadata, i);
+				}
+				
+			}
+
+			
+
+			SetFilePointer(L2_register_handle, offset + L2_BLOOM_FILTER_SIZE, 0, NULL);
+			WriteFile(
+				L2_register_handle,
+				metadata,
+				L2_OFFSETS + 48,
+				&bytes,
+				NULL
+			);
+		}
+
+		CloseHandle(L2_register_handle);
+
+		};
+
+	table->columns.IterateWithCallback(deleteTombstones);
+
 }

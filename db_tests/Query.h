@@ -177,11 +177,6 @@ public:
 							cursor->L2_results_offsets.erase(it_1);
 							cursor->L2_results_registers.erase(it_r1);
 						}
-						else {
-							/*it_r0++;
-							it_0++;*/
-
-						}
 					}
 
 				}
@@ -207,7 +202,10 @@ public:
 		}
 		
 		if(querriesResults->head->L1_results.size())
-		BufferManager::DeleteValuesLevel1(table, querriesResults->head->L1_results);
+			BufferManager::DeleteValuesLevel1(table, querriesResults->head->L1_results);
+
+		if (querriesResults->head->L2_results_registers.size())
+			BufferManager::DeleteValuesLevel2(table, querriesResults->head->L2_results_registers, querriesResults->head->L2_results_offsets);
 
 		querriesResults->DeleteNode(querriesResults->head);
 		

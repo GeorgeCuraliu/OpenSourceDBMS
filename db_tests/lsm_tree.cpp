@@ -252,5 +252,6 @@ void test5(Table& table) {
 	Query* query = new Query(&table);
 	query->FindByComparator((char*)"c1", argsss, 1, EQUALS | LESS);
 	query->FindByComparator((char*)"c2", args, 1, EQUALS);
-	query->CompareQueries(OR);
+	query->CompareQueries(OR)->Delete();
+	query->FindByComparator((char*)"c2", args, 1, EQUALS);
 }
