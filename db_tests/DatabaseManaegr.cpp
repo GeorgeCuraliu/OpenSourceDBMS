@@ -1,0 +1,6 @@
+class DatabaseManager {
+public:
+	DatabaseManager(){
+
+	}
+};
